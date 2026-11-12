@@ -85,7 +85,7 @@ function calculate(date: Date) {
 
 /*
  * Earth's orbit is sampled from Astronomy Engine.
- * The orbit line and Earth position now use the same
+ * The orbit line and Earth position use the same
  * heliocentric coordinate system.
  */
 function OrbitPath({
@@ -517,26 +517,66 @@ export default function App() {
     () => new Date()
   );
 
+  /*
+   * Continuous simulation clock.
+   *
+   * speed is simulated minutes per real second.
+   * requestAnimationFrame advances the clock every rendered
+   * frame instead of jumping once per second.
+   */
   useEffect(() => {
     if (!playing) return;
 
-    const id = window.setInterval(() => {
-      setDate(d =>
-        new Date(d.getTime() + 60000 * speed)
-      );
-    }, 1000);
+    let frameId = 0;
+    let previousFrame = 0;
 
-    return () => window.clearInterval(id);
+    const animate = (timestamp: number) => {
+      if (previousFrame === 0) {
+        previousFrame = timestamp;
+      }
+
+      // Avoid a giant catch-up jump after a suspended browser tab.
+      const elapsedSeconds = Math.min(
+        (timestamp - previousFrame) / 1000,
+        0.25
+      );
+
+      previousFrame = timestamp;
+
+      setDate(current =>
+        new Date(
+          current.getTime() +
+          elapsedSeconds * 60000 * speed
+        )
+      );
+
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    frameId = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
   }, [playing, speed]);
 
+  /*
+   * Only update the selected calendar day when the date
+   * actually crosses into a different local day.
+   * This avoids recalculating lunar rise/set every frame.
+   */
   useEffect(() => {
-    setSelectedDay(
-      new Date(
+    setSelectedDay(current => {
+      const next = new Date(
         date.getFullYear(),
         date.getMonth(),
         date.getDate()
-      )
-    );
+      );
+
+      return dateKey(current) === dateKey(next)
+        ? current
+        : next;
+    });
   }, [date]);
 
   const sky = useMemo(
@@ -838,11 +878,12 @@ export default function App() {
             value={speed}
             onChange={e => setSpeed(Number(e.target.value))}
           >
-            <option value={1}>1×</option>
-            <option value={60}>1 min/s</option>
+            <option value={1}>1 min/s</option>
+            <option value={60}>1 hour/s</option>
             <option value={1440}>1 day/s</option>
             <option value={10080}>1 week/s</option>
             <option value={43200}>30 days/s</option>
+            <option value={144000}>100 days/s</option>
           </select>
         </div>
       </section>
