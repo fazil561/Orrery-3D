@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import * as Astronomy from 'astronomy-engine';
 
 type Vec = { x: number; y: number; z: number };
+
 type Place = {
   name: string;
   country?: string;
@@ -23,15 +24,25 @@ const DEFAULT_PLACE: Place = {
 };
 
 const v = (p: { x: number; y: number; z: number }): Vec => ({
-  x: p.x, y: p.y, z: p.z
+  x: p.x,
+  y: p.y,
+  z: p.z
 });
-const add = (a: Vec, b: Vec): Vec => ({
-  x: a.x + b.x, y: a.y + b.y, z: a.z + b.z
-});
+
 const mul = (a: Vec, n: number): Vec => ({
-  x: a.x * n, y: a.y * n, z: a.z * n
+  x: a.x * n,
+  y: a.y * n,
+  z: a.z * n
 });
+
+const add = (a: Vec, b: Vec): Vec => ({
+  x: a.x + b.x,
+  y: a.y + b.y,
+  z: a.z + b.z
+});
+
 const mag = (a: Vec) => Math.hypot(a.x, a.y, a.z) || 1;
+
 const norm = (a: Vec) => mul(a, 1 / mag(a));
 
 const AU_KM = 149597870.7;
@@ -40,10 +51,25 @@ const MOON_BOOST = 110;
 
 function calculate(date: Date) {
   const t = new Astronomy.AstroTime(date);
-  const earth = mul(v(Astronomy.HelioVector(Astronomy.Body.Earth, t)), AU_SCENE);
-  const moonGeo = v(Astronomy.GeoVector(Astronomy.Body.Moon, t, true));
-  const sunGeo = v(Astronomy.GeoVector(Astronomy.Body.Sun, t, true));
-  const moon = add(earth, mul(moonGeo, AU_SCENE * MOON_BOOST));
+
+  const earth = mul(
+    v(Astronomy.HelioVector(Astronomy.Body.Earth, t)),
+    AU_SCENE
+  );
+
+  const moonGeo = v(
+    Astronomy.GeoVector(Astronomy.Body.Moon, t, true)
+  );
+
+  const sunGeo = v(
+    Astronomy.GeoVector(Astronomy.Body.Sun, t, true)
+  );
+
+  const moon = add(
+    earth,
+    mul(moonGeo, AU_SCENE * MOON_BOOST)
+  );
+
   const phase = Astronomy.MoonPhase(t);
 
   return {
@@ -56,11 +82,18 @@ function calculate(date: Date) {
   };
 }
 
-function OrbitPath({ radius, color }: { radius: number; color: string }) {
+function OrbitPath({
+  radius,
+  color
+}: {
+  radius: number;
+  color: string;
+}) {
   const points = useMemo(
     () =>
       Array.from({ length: 241 }, (_, i) => {
         const a = (i / 240) * Math.PI * 2;
+
         return [
           Math.cos(a) * radius,
           0,
@@ -90,20 +123,28 @@ function Scene({
   mode: string;
   place: Place;
 }) {
-  const sky = useMemo(() => calculate(date), [date.getTime()]);
+  const sky = useMemo(
+    () => calculate(date),
+    [date.getTime()]
+  );
+
   const earthRef = useRef<THREE.Group>(null);
   const moonRef = useRef<THREE.Group>(null);
 
   useFrame(() => {
-    const sidereal = Astronomy.SiderealTime(new Astronomy.AstroTime(date));
+    const sidereal = Astronomy.SiderealTime(
+      new Astronomy.AstroTime(date)
+    );
 
     if (earthRef.current) {
-      earthRef.current.rotation.y = -(sidereal * Math.PI / 12);
+      earthRef.current.rotation.y =
+        -(sidereal * Math.PI / 12);
     }
 
     if (moonRef.current) {
       moonRef.current.rotation.y =
-        (date.getTime() / 86400000) * (2 * Math.PI / 27.321661);
+        (date.getTime() / 86400000) *
+        (2 * Math.PI / 27.321661);
     }
   });
 
@@ -130,9 +171,15 @@ function Scene({
   return (
     <>
       <color attach="background" args={['#080b16']} />
+
       <ambientLight intensity={0.18} />
+
       <directionalLight
-        position={[s.x * 100, s.y * 100, s.z * 100]}
+        position={[
+          s.x * 100,
+          s.y * 100,
+          s.z * 100
+        ]}
         intensity={2.8}
       />
 
@@ -154,17 +201,26 @@ function Scene({
       <OrbitPath radius={5} color="#45536e" />
 
       <Line
-        points={[[e.x, e.y, e.z], [m.x, m.y, m.z]]}
+        points={[
+          [e.x, e.y, e.z],
+          [m.x, m.y, m.z]
+        ]}
         color="#8198b9"
         transparent
         opacity={0.35}
         lineWidth={1}
       />
 
-      <group ref={earthRef} position={[e.x, e.y, e.z]}>
+      <group
+        ref={earthRef}
+        position={[e.x, e.y, e.z]}
+      >
         <mesh>
           <sphereGeometry args={[0.32, 64, 48]} />
-          <meshStandardMaterial color="#397fc0" roughness={0.92} />
+          <meshStandardMaterial
+            color="#397fc0"
+            roughness={0.92}
+          />
         </mesh>
 
         <mesh scale={1.012}>
@@ -191,23 +247,41 @@ function Scene({
         </mesh>
       </group>
 
-      <group ref={moonRef} position={[m.x, m.y, m.z]}>
+      <group
+        ref={moonRef}
+        position={[m.x, m.y, m.z]}
+      >
         <mesh>
           <sphereGeometry args={[0.105, 64, 48]} />
-          <meshStandardMaterial color="#c9c9c2" roughness={1} />
+          <meshStandardMaterial
+            color="#c9c9c2"
+            roughness={1}
+          />
         </mesh>
       </group>
 
       <Html position={[0, 0.95, 0]} center>
-        <span className="space-label sun-label">SUN</span>
+        <span className="space-label sun-label">
+          SUN
+        </span>
       </Html>
 
-      <Html position={[e.x, e.y + 0.52, e.z]} center>
-        <span className="space-label">{place.name.toUpperCase()}</span>
+      <Html
+        position={[e.x, e.y + 0.52, e.z]}
+        center
+      >
+        <span className="space-label">
+          {place.name.toUpperCase()}
+        </span>
       </Html>
 
-      <Html position={[m.x, m.y + 0.24, m.z]} center>
-        <span className="space-label">MOON</span>
+      <Html
+        position={[m.x, m.y + 0.24, m.z]}
+        center
+      >
+        <span className="space-label">
+          MOON
+        </span>
       </Html>
 
       <OrbitControls
@@ -223,7 +297,8 @@ function Scene({
 }
 
 const localInput = (d: Date) => {
-  const p = (n: number) => String(n).padStart(2, '0');
+  const p = (n: number) =>
+    String(n).padStart(2, '0');
 
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
@@ -231,8 +306,8 @@ const localInput = (d: Date) => {
 const dateKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-function phaseName(a: number) {
-  const p = (a % 360 + 360) % 360;
+function phaseName(angle: number) {
+  const p = (angle % 360 + 360) % 360;
 
   if (p < 22.5 || p >= 337.5) return 'New Moon';
   if (p < 67.5) return 'Waxing Crescent';
@@ -246,20 +321,34 @@ function phaseName(a: number) {
 }
 
 function phaseInfo(date: Date) {
-  const angle = Astronomy.MoonPhase(new Astronomy.AstroTime(date));
+  const angle = Astronomy.MoonPhase(
+    new Astronomy.AstroTime(date)
+  );
 
   return {
     angle,
     name: phaseName(angle),
-    illumination: (1 - Math.cos(angle * Math.PI / 180)) / 2
+    illumination:
+      (1 - Math.cos(angle * Math.PI / 180)) / 2
   };
 }
 
 function riseSet(date: Date, place: Place) {
-  const observer = new Astronomy.Observer(place.lat, place.lon, 0);
+  const observer = new Astronomy.Observer(
+    place.lat,
+    place.lon,
+    0
+  );
 
   const start = new Astronomy.AstroTime(
-    new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0)
+    new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      0,
+      0,
+      0
+    )
   );
 
   const rise = Astronomy.SearchRiseSet(
@@ -285,13 +374,20 @@ function riseSet(date: Date, place: Place) {
 }
 
 function skyPosition(date: Date, place: Place) {
-  const observer = new Astronomy.Observer(place.lat, place.lon, 0);
+  const observer = new Astronomy.Observer(
+    place.lat,
+    place.lon,
+    0
+  );
+
   const time = new Astronomy.AstroTime(date);
 
+  // Corrected: Equator requires five arguments.
   const eq = Astronomy.Equator(
     Astronomy.Body.Moon,
     time,
     observer,
+    true,
     true
   );
 
@@ -311,7 +407,10 @@ function skyPosition(date: Date, place: Place) {
 
 function timeLabel(d: Date | null) {
   return d
-    ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    ? d.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
     : 'No event';
 }
 
@@ -322,8 +421,9 @@ function monthCells(year: number, month: number) {
 
   return [
     ...Array(start).fill(null),
-    ...Array.from({ length: count }, (_, i) =>
-      new Date(year, month, i + 1)
+    ...Array.from(
+      { length: count },
+      (_, i) => new Date(year, month, i + 1)
     )
   ];
 }
@@ -345,16 +445,24 @@ export default function App() {
   );
 
   const [selectedDay, setSelectedDay] = useState(
-    () => new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    () => new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    )
   );
 
-  const [observerTime, setObserverTime] = useState(() => new Date());
+  const [observerTime, setObserverTime] = useState(
+    () => new Date()
+  );
 
   useEffect(() => {
     if (!playing) return;
 
     const id = window.setInterval(() => {
-      setDate(d => new Date(d.getTime() + 60000 * speed));
+      setDate(d =>
+        new Date(d.getTime() + 60000 * speed)
+      );
     }, 1000);
 
     return () => window.clearInterval(id);
@@ -362,26 +470,48 @@ export default function App() {
 
   useEffect(() => {
     setSelectedDay(
-      new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      )
     );
   }, [date]);
 
-  const sky = useMemo(() => calculate(date), [date.getTime()]);
+  const sky = useMemo(
+    () => calculate(date),
+    [date.getTime()]
+  );
+
   const distance = mag(sky.moonGeo) * AU_KM;
 
   const events = useMemo(
     () => riseSet(selectedDay, place),
-    [selectedDay.getTime(), place.lat, place.lon]
+    [
+      selectedDay.getTime(),
+      place.lat,
+      place.lon
+    ]
   );
 
   const position = useMemo(
     () => skyPosition(observerTime, place),
-    [observerTime.getTime(), place.lat, place.lon]
+    [
+      observerTime.getTime(),
+      place.lat,
+      place.lon
+    ]
   );
 
   const cells = useMemo(
-    () => monthCells(calendarMonth.getFullYear(), calendarMonth.getMonth()),
-    [calendarMonth.getFullYear(), calendarMonth.getMonth()]
+    () => monthCells(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth()
+    ),
+    [
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth()
+    ]
   );
 
   const searchCities = async () => {
@@ -395,11 +525,15 @@ export default function App() {
         `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=en&format=json`
       );
 
-      if (!response.ok) throw new Error('City search unavailable');
+      if (!response.ok) {
+        throw new Error('City search unavailable');
+      }
 
       const data = await response.json();
 
-      const found: Place[] = (data.results || []).map((x: any) => ({
+      const found: Place[] = (
+        data.results || []
+      ).map((x: any) => ({
         name: x.name,
         country: x.country,
         lat: x.latitude,
@@ -410,7 +544,9 @@ export default function App() {
       setResults(found);
 
       if (!found.length) {
-        setLocationMessage('No matching cities found. Try a nearby larger city.');
+        setLocationMessage(
+          'No matching cities found. Try a nearby larger city.'
+        );
       }
     } catch {
       setLocationMessage(
@@ -423,11 +559,15 @@ export default function App() {
 
   const useMyLocation = () => {
     if (!navigator.geolocation) {
-      setLocationMessage('This browser does not support location access.');
+      setLocationMessage(
+        'This browser does not support location access.'
+      );
       return;
     }
 
-    setLocationMessage('Waiting for browser location permission…');
+    setLocationMessage(
+      'Waiting for browser location permission…'
+    );
 
     navigator.geolocation.getCurrentPosition(
       pos => {
@@ -452,14 +592,21 @@ export default function App() {
             : 'Could not determine your location. Try city search.'
         );
       },
-      { enableHighAccuracy: true, timeout: 12000 }
+      {
+        enableHighAccuracy: true,
+        timeout: 12000
+      }
     );
   };
 
   const choosePlace = (p: Place) => {
     setPlace(p);
     setResults([]);
-    setQuery(`${p.name}${p.country ? `, ${p.country}` : ''}`);
+
+    setQuery(
+      `${p.name}${p.country ? `, ${p.country}` : ''}`
+    );
+
     setLocationMessage(
       `Observing from ${p.name}${p.country ? `, ${p.country}` : ''}`
     );
@@ -467,7 +614,16 @@ export default function App() {
 
   const chooseCalendarDate = (d: Date) => {
     setSelectedDay(d);
-    setDate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0));
+
+    setDate(
+      new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate(),
+        12,
+        0
+      )
+    );
   };
 
   const selectedPhase = phaseInfo(selectedDay);
@@ -475,7 +631,11 @@ export default function App() {
 
   const moveMonth = (delta: number) => {
     setCalendarMonth(
-      d => new Date(d.getFullYear(), d.getMonth() + delta, 1)
+      d => new Date(
+        d.getFullYear(),
+        d.getMonth() + delta,
+        1
+      )
     );
   };
 
@@ -484,18 +644,35 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark">◉</span>
+
           <div>
             <div className="brand-name">ORRERY</div>
-            <div className="brand-sub">A LIVING MODEL OF THE SKY</div>
+            <div className="brand-sub">
+              A LIVING MODEL OF THE SKY
+            </div>
           </div>
         </div>
-        <div className="live-indicator"><i /> EPHEMERIS ACTIVE</div>
+
+        <div className="live-indicator">
+          <i /> EPHEMERIS ACTIVE
+        </div>
       </header>
 
       <section className="intro">
-        <div className="eyebrow">THE CELESTIAL MECHANICS STUDIO</div>
-        <h1>Time is another<br /><em>dimension of space.</em></h1>
-        <p>Explore the Sun, Earth and Moon — from any date, beneath any sky.</p>
+        <div className="eyebrow">
+          THE CELESTIAL MECHANICS STUDIO
+        </div>
+
+        <h1>
+          Time is another
+          <br />
+          <em>dimension of space.</em>
+        </h1>
+
+        <p>
+          Explore the Sun, Earth and Moon — from any date,
+          beneath any sky.
+        </p>
       </section>
 
       <nav className="main-tabs">
@@ -522,16 +699,24 @@ export default function App() {
         </div>
 
         <Canvas camera={{ position: [0, 8, 12], fov: 42 }}>
-          <Scene date={date} mode={mode} place={place} />
+          <Scene
+            date={date}
+            mode={mode}
+            place={place}
+          />
         </Canvas>
 
-        <div className="canvas-hint">DRAG TO ORBIT · SCROLL TO ZOOM</div>
+        <div className="canvas-hint">
+          DRAG TO ORBIT · SCROLL TO ZOOM
+        </div>
       </section>
 
       <section className="control-panel">
         <div className="panel-title">
           02 / TIME MACHINE
-          <span>LOCAL TIME · {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+          <span>
+            LOCAL TIME · {Intl.DateTimeFormat().resolvedOptions().timeZone}
+          </span>
         </div>
 
         <div className="time-row">
@@ -540,31 +725,54 @@ export default function App() {
             type="datetime-local"
             value={localInput(date)}
             onChange={e => {
-              if (e.target.value) setDate(new Date(e.target.value));
+              if (e.target.value) {
+                setDate(new Date(e.target.value));
+              }
             }}
           />
-          <button className="now-btn" onClick={() => setDate(new Date())}>
+
+          <button
+            className="now-btn"
+            onClick={() => setDate(new Date())}
+          >
             NOW
           </button>
         </div>
 
         <div className="transport">
-          <button onClick={() => setDate(d => new Date(d.getTime() - 86400000))}>
+          <button
+            onClick={() =>
+              setDate(d =>
+                new Date(d.getTime() - 86400000)
+              )
+            }
+          >
             − 1 DAY
           </button>
 
-          <button className="play-btn" onClick={() => setPlaying(x => !x)}>
+          <button
+            className="play-btn"
+            onClick={() => setPlaying(x => !x)}
+          >
             {playing ? 'Ⅱ PAUSE' : '▶ PLAY TIME'}
           </button>
 
-          <button onClick={() => setDate(d => new Date(d.getTime() + 86400000))}>
+          <button
+            onClick={() =>
+              setDate(d =>
+                new Date(d.getTime() + 86400000)
+              )
+            }
+          >
             + 1 DAY
           </button>
 
           <select
             aria-label="Time speed"
             value={speed}
-            onChange={e => setSpeed(Number(e.target.value))}
+            onChange={e =>
+              setSpeed(Number(e.target.value))
+            }
           >
             <option value={1}>1×</option>
             <option value={60}>1 min/s</option>
@@ -582,8 +790,14 @@ export default function App() {
         </div>
 
         <div className="location-current">
-          <strong>{place.name}{place.country ? `, ${place.country}` : ''}</strong>
-          <span>{place.lat.toFixed(4)}°, {place.lon.toFixed(4)}°</span>
+          <strong>
+            {place.name}
+            {place.country ? `, ${place.country}` : ''}
+          </strong>
+
+          <span>
+            {place.lat.toFixed(4)}°, {place.lon.toFixed(4)}°
+          </span>
         </div>
 
         <div className="location-actions">
@@ -592,21 +806,31 @@ export default function App() {
             placeholder="Search any city worldwide…"
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter') void searchCities();
+              if (e.key === 'Enter') {
+                void searchCities();
+              }
             }}
           />
 
-          <button onClick={() => void searchCities()} disabled={searching}>
+          <button
+            onClick={() => void searchCities()}
+            disabled={searching}
+          >
             {searching ? 'SEARCHING…' : 'SEARCH CITY'}
           </button>
 
-          <button className="geo-btn" onClick={useMyLocation}>
+          <button
+            className="geo-btn"
+            onClick={useMyLocation}
+          >
             ◎ USE MY LOCATION
           </button>
         </div>
 
         {locationMessage && (
-          <p className="location-message">{locationMessage}</p>
+          <p className="location-message">
+            {locationMessage}
+          </p>
         )}
 
         {results.length > 0 && (
@@ -617,8 +841,10 @@ export default function App() {
                 onClick={() => choosePlace(p)}
               >
                 <strong>{p.name}</strong>
+
                 <span>
-                  {p.country || 'Location'} · {p.lat.toFixed(2)}, {p.lon.toFixed(2)}
+                  {p.country || 'Location'} ·
+                  {' '}{p.lat.toFixed(2)}, {p.lon.toFixed(2)}
                 </span>
               </button>
             ))}
@@ -626,45 +852,73 @@ export default function App() {
         )}
 
         <p className="small-note">
-          Your browser asks permission before sharing your location.
-          ORRERY uses it only in this page to calculate your local sky.
+          Your browser asks permission before sharing your
+          location. ORRERY uses it only in this page to
+          calculate your local sky.
         </p>
       </section>
 
       <section className="data-grid">
         <article className="data-card phase-card">
-          <div className="card-kicker">04 / LUNAR PHASE</div>
+          <div className="card-kicker">
+            04 / LUNAR PHASE
+          </div>
+
           <div className="phase-row">
             <div className="moon-glyph">◐</div>
+
             <div>
               <h2>{phaseName(sky.phase)}</h2>
+
               <p>
-                {(sky.illumination * 100).toFixed(1)}% illuminated ·
-                {' '}{sky.phase.toFixed(1)}° phase angle
+                {(sky.illumination * 100).toFixed(1)}%
+                illuminated · {sky.phase.toFixed(1)}°
+                phase angle
               </p>
             </div>
           </div>
+
           <div className="meter">
-            <span style={{ width: `${sky.illumination * 100}%` }} />
+            <span
+              style={{
+                width: `${sky.illumination * 100}%`
+              }}
+            />
           </div>
         </article>
 
         <article className="data-card">
-          <div className="card-kicker">05 / EARTH–MOON</div>
-          <h2>{distance.toLocaleString('en-US', { maximumFractionDigits: 0 })} km</h2>
+          <div className="card-kicker">
+            05 / EARTH–MOON
+          </div>
+
+          <h2>
+            {distance.toLocaleString('en-US', {
+              maximumFractionDigits: 0
+            })} km
+          </h2>
+
           <p>Geocentric distance</p>
         </article>
 
         <article className="data-card">
-          <div className="card-kicker">06 / SIMULATION DATE</div>
+          <div className="card-kicker">
+            06 / SIMULATION DATE
+          </div>
+
           <h2>
             {date.toLocaleDateString(undefined, {
-              day: '2-digit', month: 'short', year: 'numeric'
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric'
             })}
           </h2>
+
           <p>
             {date.toLocaleTimeString(undefined, {
-              hour: '2-digit', minute: '2-digit', second: '2-digit'
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
             })} · local
           </p>
         </article>
@@ -677,26 +931,48 @@ export default function App() {
         </div>
 
         <div className="calendar-heading">
-          <button onClick={() => moveMonth(-1)}>←</button>
+          <button onClick={() => moveMonth(-1)}>
+            ←
+          </button>
+
           <h2>
             {calendarMonth.toLocaleDateString(undefined, {
-              month: 'long', year: 'numeric'
+              month: 'long',
+              year: 'numeric'
             })}
           </h2>
-          <button onClick={() => moveMonth(1)}>→</button>
+
+          <button onClick={() => moveMonth(1)}>
+            →
+          </button>
         </div>
 
         <div className="calendar-grid">
-          {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(x => (
-            <div className="weekday" key={x}>{x}</div>
+          {[
+            'SUN', 'MON', 'TUE', 'WED',
+            'THU', 'FRI', 'SAT'
+          ].map(x => (
+            <div className="weekday" key={x}>
+              {x}
+            </div>
           ))}
 
           {cells.map((d, i) => {
-            if (!d) return <div className="calendar-empty" key={`e${i}`} />;
+            if (!d) {
+              return (
+                <div
+                  className="calendar-empty"
+                  key={`e${i}`}
+                />
+              );
+            }
 
             const info = phaseInfo(d);
-            const chosen = dateKey(d) === dateKey(selectedDay);
-            const today = dateKey(d) === dateKey(new Date());
+            const chosen =
+              dateKey(d) === dateKey(selectedDay);
+
+            const today =
+              dateKey(d) === dateKey(new Date());
 
             return (
               <button
@@ -705,14 +981,20 @@ export default function App() {
                 onClick={() => chooseCalendarDate(d)}
               >
                 <span>{d.getDate()}</span>
+
                 <i>
                   {info.illumination > 0.94
                     ? '●'
                     : info.illumination < 0.06
                       ? '○'
-                      : info.angle < 180 ? '◔' : '◕'}
+                      : info.angle < 180
+                        ? '◔'
+                        : '◕'}
                 </i>
-                <small>{Math.round(info.illumination * 100)}%</small>
+
+                <small>
+                  {Math.round(info.illumination * 100)}%
+                </small>
               </button>
             );
           })}
@@ -721,11 +1003,16 @@ export default function App() {
         <div className="calendar-detail">
           <strong>
             {selectedDay.toLocaleDateString(undefined, {
-              weekday: 'long', day: 'numeric', month: 'long'
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long'
             })}
           </strong>
+
           <span>
-            {selectedPhase.name} · {(selectedPhase.illumination * 100).toFixed(1)}% illuminated
+            {selectedPhase.name} ·
+            {' '}{(selectedPhase.illumination * 100).toFixed(1)}%
+            illuminated
           </span>
         </div>
       </section>
@@ -741,27 +1028,37 @@ export default function App() {
             <span>MOONRISE</span>
             <strong>{timeLabel(events.rise)}</strong>
           </article>
+
           <article>
             <span>MOONSET</span>
             <strong>{timeLabel(events.set)}</strong>
           </article>
+
           <article>
             <span>ILLUMINATION</span>
-            <strong>{(livePhase.illumination * 100).toFixed(1)}%</strong>
+            <strong>
+              {(livePhase.illumination * 100).toFixed(1)}%
+            </strong>
           </article>
         </div>
 
         <div className="position-grid">
           <article>
             <span>ALTITUDE</span>
-            <strong>{position.altitude.toFixed(1)}°</strong>
+            <strong>
+              {position.altitude.toFixed(1)}°
+            </strong>
           </article>
 
           <article>
             <span>AZIMUTH</span>
-            <strong>{position.azimuth.toFixed(1)}°</strong>
+            <strong>
+              {position.azimuth.toFixed(1)}°
+            </strong>
+
             <small>
-              {position.azimuth < 22.5 || position.azimuth >= 337.5
+              {position.azimuth < 22.5 ||
+              position.azimuth >= 337.5
                 ? 'NORTH'
                 : position.azimuth < 67.5
                   ? 'NORTH-EAST'
@@ -787,29 +1084,42 @@ export default function App() {
 
         <div className="observer-time">
           <label>Inspect local sky at</label>
+
           <input
             type="datetime-local"
             value={localInput(observerTime)}
             onChange={e => {
-              if (e.target.value) setObserverTime(new Date(e.target.value));
+              if (e.target.value) {
+                setObserverTime(
+                  new Date(e.target.value)
+                );
+              }
             }}
           />
-          <button onClick={() => setObserverTime(new Date())}>NOW</button>
+
+          <button
+            onClick={() => setObserverTime(new Date())}
+          >
+            NOW
+          </button>
         </div>
 
         <p className="small-note">
-          Rise and set are calculated for the selected date and observing
-          coordinates. Times are shown in your device's local timezone;
-          near the poles or during unusual lunar cycles, an event may not
+          Rise and set are calculated for the selected
+          date and observing coordinates. Times are shown
+          in your device's local timezone. Near the poles
+          or during unusual lunar cycles, an event may not
           occur that day.
         </p>
       </section>
 
       <footer>
         <span>ORRERY / FIELD NOTES 002</span>
+
         <span>
-          Ephemerides: Astronomy Engine · City search: Open-Meteo Geocoding ·
-          Body sizes and Moon distance visually exaggerated
+          Ephemerides: Astronomy Engine · City search:
+          Open-Meteo Geocoding · Body sizes and Moon
+          distance visually exaggerated
         </span>
       </footer>
     </main>
