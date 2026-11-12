@@ -49,45 +49,68 @@ const norm = (a: Vec) => mul(a, 1 / mag(a));
 const AU_KM = 149597870.7;
 const AU_SCENE = 5;
 const MOON_BOOST = 110;
+const OBLIQUITY = 23.4392911 * Math.PI / 180;
+
+/*
+ * Astronomy Engine returns J2000 equatorial coordinates.
+ * Convert them to ecliptic coordinates, then map the
+ * ecliptic plane onto Three.js XZ.
+ *
+ * This keeps Earth's orbit in one clean, level plane.
+ */
+function toEclipticScene(
+  vector: { x: number; y: number; z: number },
+  scale = 1
+): Vec {
+  const yEcliptic =
+    vector.y * Math.cos(OBLIQUITY) +
+    vector.z * Math.sin(OBLIQUITY);
+
+  const zEcliptic =
+    -vector.y * Math.sin(OBLIQUITY) +
+    vector.z * Math.cos(OBLIQUITY);
+
+  return {
+    x: vector.x * scale,
+    y: zEcliptic * scale,
+    z: yEcliptic * scale
+  };
+}
 
 function calculate(date: Date) {
   const t = new Astronomy.AstroTime(date);
 
-  const earth = mul(
-    v(Astronomy.HelioVector(Astronomy.Body.Earth, t)),
+  const earth = toEclipticScene(
+    Astronomy.HelioVector(Astronomy.Body.Earth, t),
     AU_SCENE
   );
 
-  const moonGeo = v(
+  const moonGeoRaw = v(
     Astronomy.GeoVector(Astronomy.Body.Moon, t, true)
   );
 
-  const sunGeo = v(
+  const moonGeo = toEclipticScene(
+    moonGeoRaw,
+    AU_SCENE * MOON_BOOST
+  );
+
+  const sunGeo = toEclipticScene(
     Astronomy.GeoVector(Astronomy.Body.Sun, t, true)
   );
 
-  const moon = add(
-    earth,
-    mul(moonGeo, AU_SCENE * MOON_BOOST)
-  );
-
+  const moon = add(earth, moonGeo);
   const phase = Astronomy.MoonPhase(t);
 
   return {
     earth,
     moon,
-    moonGeo,
+    moonGeo: moonGeoRaw,
     phase,
     illumination: (1 - Math.cos(phase * Math.PI / 180)) / 2,
     sunDirection: norm(sunGeo)
   };
 }
 
-/*
- * Earth's orbit is sampled from Astronomy Engine.
- * The orbit line and Earth position use the same
- * heliocentric coordinate system.
- */
 function OrbitPath({
   date,
   color
@@ -97,9 +120,11 @@ function OrbitPath({
 }) {
   const points = useMemo(
     () =>
-      Array.from({ length: 367 }, (_, i) => {
+      Array.from({ length: 721 }, (_, i) => {
+        const offsetDays = (i / 720 - 0.5) * 365.256;
+
         const sampleDate = new Date(
-          date.getTime() + (i - 183) * 2 * 86400000
+          date.getTime() + offsetDays * 86400000
         );
 
         const position = Astronomy.HelioVector(
@@ -107,10 +132,15 @@ function OrbitPath({
           new Astronomy.AstroTime(sampleDate)
         );
 
+        const scenePosition = toEclipticScene(
+          position,
+          AU_SCENE
+        );
+
         return [
-          position.x * AU_SCENE,
-          position.y * AU_SCENE,
-          position.z * AU_SCENE
+          scenePosition.x,
+          scenePosition.y,
+          scenePosition.z
         ] as [number, number, number];
       }),
     [date.getFullYear()]
@@ -130,11 +160,13 @@ function OrbitPath({
 function Scene({
   date,
   mode,
-  place
+  place,
+  resetKey
 }: {
   date: Date;
   mode: string;
   place: Place;
+  resetKey: number;
 }) {
   const sky = useMemo(
     () => calculate(date),
@@ -150,40 +182,37 @@ function Scene({
   );
 
   /*
-   * Set the camera target when switching views.
-   * Moon mode opens with the Moon centred.
+   * Set the initial camera position when changing views
+   * or when the user presses the reset button.
    */
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
 
+    const camera = controls.object as THREE.PerspectiveCamera;
+
     if (mode === 'moon') {
-      const moonTarget = new THREE.Vector3(
+      camera.up.set(0, 1, 0);
+
+      const target = new THREE.Vector3(
         sky.moon.x,
         sky.moon.y,
         sky.moon.z
       );
 
-      controls.target.copy(moonTarget);
+      controls.target.copy(target);
 
-      controls.object.position
-        .copy(moonTarget)
-        .add(new THREE.Vector3(0, 0.32, 0.85));
-    } else if (mode === 'earth') {
-      const earthTarget = new THREE.Vector3(
-        sky.earth.x,
-        sky.earth.y,
-        sky.earth.z
-      );
-
-      controls.target.copy(earthTarget);
-
-      controls.object.position
-        .copy(earthTarget)
-        .add(new THREE.Vector3(0, 1.2, 2.8));
+      camera.position
+        .copy(target)
+        .add(new THREE.Vector3(0, 0.32, 0.9));
     } else {
+      /*
+       * A near top-down view makes the ecliptic plane
+       * appear straight and easy to understand.
+       */
+      camera.up.set(0, 0, -1);
       controls.target.set(0, 0, 0);
-      controls.object.position.set(0, 8, 12);
+      camera.position.set(0, 14, 0.01);
     }
 
     previousMoon.current.set(
@@ -193,11 +222,14 @@ function Scene({
     );
 
     controls.update();
-  }, [mode]);
+  }, [mode, resetKey]);
 
   useFrame(() => {
     /*
-     * Keep the Moon camera centred as simulated time changes.
+     * Moon tracking:
+     * Move both the camera and its target by the Moon's
+     * position change. The camera therefore keeps the
+     * Moon centred without interrupting the user's orbit.
      */
     if (mode === 'moon' && controlsRef.current) {
       const nextMoon = new THREE.Vector3(
@@ -206,7 +238,9 @@ function Scene({
         sky.moon.z
       );
 
-      const shift = nextMoon.clone().sub(previousMoon.current);
+      const shift = nextMoon
+        .clone()
+        .sub(previousMoon.current);
 
       controlsRef.current.target.add(shift);
       controlsRef.current.object.position.add(shift);
@@ -234,13 +268,6 @@ function Scene({
   const e = sky.earth;
   const m = sky.moon;
   const s = sky.sunDirection;
-
-  const target: [number, number, number] =
-    mode === 'earth'
-      ? [e.x, e.y, e.z]
-      : mode === 'moon'
-        ? [m.x, m.y, m.z]
-        : [0, 0, 0];
 
   const lat = place.lat * Math.PI / 180;
   const lon = place.lon * Math.PI / 180;
@@ -349,11 +376,13 @@ function Scene({
       <OrbitControls
         ref={controlsRef}
         makeDefault
+        enableRotate
+        enablePan
+        enableZoom
         enableDamping
         dampingFactor={0.08}
         minDistance={mode === 'moon' ? 0.15 : 1.5}
         maxDistance={mode === 'moon' ? 8 : 30}
-        target={target}
       />
     </>
   );
@@ -494,6 +523,7 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [mode, setMode] = useState('system');
+  const [viewResetKey, setViewResetKey] = useState(0);
 
   const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
   const [query, setQuery] = useState('');
@@ -519,10 +549,7 @@ export default function App() {
 
   /*
    * Continuous simulation clock.
-   *
-   * speed is simulated minutes per real second.
-   * requestAnimationFrame advances the clock every rendered
-   * frame instead of jumping once per second.
+   * Speed is simulated minutes per real second.
    */
   useEffect(() => {
     if (!playing) return;
@@ -535,7 +562,6 @@ export default function App() {
         previousFrame = timestamp;
       }
 
-      // Avoid a giant catch-up jump after a suspended browser tab.
       const elapsedSeconds = Math.min(
         (timestamp - previousFrame) / 1000,
         0.25
@@ -560,11 +586,6 @@ export default function App() {
     };
   }, [playing, speed]);
 
-  /*
-   * Only update the selected calendar day when the date
-   * actually crosses into a different local day.
-   * This avoids recalculating lunar rise/set every frame.
-   */
   useEffect(() => {
     setSelectedDay(current => {
       const next = new Date(
@@ -729,6 +750,10 @@ export default function App() {
     );
   };
 
+  const resetView = () => {
+    setViewResetKey(key => key + 1);
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -785,6 +810,7 @@ export default function App() {
       <section className="viewport">
         <div className="viewport-head">
           <span>01 / CELESTIAL VIEW</span>
+
           <span>
             {mode === 'city'
               ? 'GROUND-LEVEL · CITY SKY'
@@ -794,16 +820,54 @@ export default function App() {
           </span>
         </div>
 
+        {mode !== 'earth' && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '8px 12px'
+            }}
+          >
+            <button
+              type="button"
+              onClick={resetView}
+              style={{
+                padding: '8px 14px',
+                border: '1px solid rgba(160,180,220,0.35)',
+                borderRadius: '6px',
+                background: 'rgba(12,18,32,0.88)',
+                color: '#dce7ff',
+                fontSize: '11px',
+                letterSpacing: '1px',
+                cursor: 'pointer'
+              }}
+            >
+              ↺ RESET VIEW
+            </button>
+          </div>
+        )}
+
         {mode === 'city' ? (
-          <CityView date={observerTime} place={place} />
+          <CityView
+            date={observerTime}
+            place={place}
+            resetKey={viewResetKey}
+          />
         ) : mode === 'earth' ? (
           <MapGlobe place={place} />
         ) : (
-          <Canvas camera={{ position: [0, 8, 12], fov: 42 }}>
+          <Canvas
+            camera={{
+              position: [0, 14, 0.01],
+              fov: 42,
+              up: [0, 0, -1]
+            }}
+          >
             <Scene
               date={date}
               mode={mode}
               place={place}
+              resetKey={viewResetKey}
             />
           </Canvas>
         )}
