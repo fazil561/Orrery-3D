@@ -1,6 +1,8 @@
+
 import SharedMoonSurface from './MoonSurface';
+import EarthSurface from './EarthSurface';
+import EarthExplorer from './EarthExplorer';
 import CityView from './CityView';
-import MapGlobe from './MapGlobe';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars, Line, Html } from '@react-three/drei';
@@ -109,10 +111,6 @@ function calculate(date: Date) {
   };
 }
 
-/*
- * NASA lunar colour texture.
- * Falls back to the original grey material if loading fails.
- */
 function MoonSurface() {
   return <SharedMoonSurface />;
 }
@@ -310,11 +308,8 @@ function Scene({
 
       <group ref={earthRef} position={[e.x, e.y, e.z]}>
         <mesh>
-          <sphereGeometry args={[0.32, 64, 48]} />
-          <meshStandardMaterial
-            color="#397fc0"
-            roughness={0.92}
-          />
+          <sphereGeometry args={[0.32, 128, 96]} />
+          <EarthSurface />
         </mesh>
 
         <mesh scale={1.012}>
@@ -800,37 +795,35 @@ export default function App() {
             {mode === 'city'
               ? 'GROUND-LEVEL · CITY SKY'
               : mode === 'earth'
-                ? 'GLOBAL ATLAS · INTERACTIVE GLOBE'
+                ? 'EARTH EXPLORER · GROUND / ORBIT / SPACE'
                 : 'HELIOCENTRIC · 3D'}
           </span>
         </div>
 
-        {mode !== 'earth' && (
-          <div
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '8px 12px'
+          }}
+        >
+          <button
+            type="button"
+            onClick={resetView}
             style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              padding: '8px 12px'
+              padding: '8px 14px',
+              border: '1px solid rgba(160,180,220,0.35)',
+              borderRadius: '6px',
+              background: 'rgba(12,18,32,0.88)',
+              color: '#dce7ff',
+              fontSize: '11px',
+              letterSpacing: '1px',
+              cursor: 'pointer'
             }}
           >
-            <button
-              type="button"
-              onClick={resetView}
-              style={{
-                padding: '8px 14px',
-                border: '1px solid rgba(160,180,220,0.35)',
-                borderRadius: '6px',
-                background: 'rgba(12,18,32,0.88)',
-                color: '#dce7ff',
-                fontSize: '11px',
-                letterSpacing: '1px',
-                cursor: 'pointer'
-              }}
-            >
-              ↺ RESET VIEW
-            </button>
-          </div>
-        )}
+            ↺ RESET VIEW
+          </button>
+        </div>
 
         {mode === 'city' ? (
           <CityView
@@ -839,7 +832,11 @@ export default function App() {
             resetKey={viewResetKey}
           />
         ) : mode === 'earth' ? (
-          <MapGlobe place={place} />
+          <EarthExplorer
+            date={date}
+            place={place}
+            resetKey={viewResetKey}
+          />
         ) : (
           <Canvas
             camera={{
@@ -861,7 +858,7 @@ export default function App() {
           {mode === 'city'
             ? 'DRAG TO LOOK AROUND · OPEN SKY CAMERA'
             : mode === 'earth'
-              ? 'DRAG TO ROTATE · SCROLL TO ZOOM'
+              ? 'GROUND POV · ORBIT POV · SPACE EXPLORATION'
               : 'DRAG TO ORBIT · SCROLL TO ZOOM'}
         </div>
       </section>
