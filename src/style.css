@@ -612,4 +612,67 @@ footer {
   .calendar-detail { flex-direction: column; }
   .sky-camera-data { justify-content: center; }
   .sky-camera-button { right: 12px; bottom: 42px; }
+  .earth-atlas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #07111d;
+}
+
+.earth-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.earth-atlas-status {
+  position: absolute;
+  z-index: 5;
+  top: 52px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #c5d4e7;
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .1em;
+  text-shadow: 0 1px 5px #000;
+  pointer-events: none;
+}
+
+.earth-atlas-hint {
+  position: absolute;
+  z-index: 5;
+  bottom: 17px;
+  right: 18px;
+  color: #c5d4e7;
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .1em;
+  text-shadow: 0 1px 5px #000;
+  pointer-events: none;
+}
+
+.earth-atlas .maplibregl-ctrl-attrib {
+  background: #07111dcc;
+  color: #aab9ca;
+  font-size: 9px;
+}
+
+.earth-atlas .maplibregl-ctrl-attrib a {
+  color: #d6c18e;
+}
+
+@media (max-width: 700px) {
+  .earth-atlas-status {
+    top: 48px;
+    flex-direction: column;
+  }
+
+  .earth-atlas-hint {
+    left: 12px;
+    right: 12px;
+    bottom: 45px;
+    text-align: center;
+  }
+}
 }
