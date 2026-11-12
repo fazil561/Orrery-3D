@@ -1,373 +1,1217 @@
 
+import CityView from './CityView';
+import MapGlobe from './MapGlobe';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Html, OrbitControls, Stars } from '@react-three/drei';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Stars, Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import * as Astronomy from 'astronomy-engine';
 
+type Vec = { x: number; y: number; z: number };
+
 type Place = {
   name: string;
+  country?: string;
   lat: number;
   lon: number;
   timezone?: string;
 };
 
-type Props = {
-  date: Date;
-  place: Place;
+const DEFAULT_PLACE: Place = {
+  name: 'BTM Layout, Bengaluru',
+  country: 'India',
+  lat: 12.9166,
+  lon: 77.6101,
+  timezone: 'Asia/Kolkata'
 };
 
-function horizontal(date: Date, place: Place, body: Astronomy.Body) {
-  const observer = new Astronomy.Observer(place.lat, place.lon, 0);
-  const time = new Astronomy.AstroTime(date);
-  const eq = Astronomy.Equator(body, time, observer, true, true);
-  const h = Astronomy.Horizon(time, observer, eq.ra, eq.dec, 'normal');
-  const az = h.azimuth * Math.PI / 180;
-  const alt = h.altitude * Math.PI / 180;
+const v = (p: { x: number; y: number; z: number }): Vec => ({
+  x: p.x,
+  y: p.y,
+  z: p.z
+});
+
+const mul = (a: Vec, n: number): Vec => ({
+  x: a.x * n,
+  y: a.y * n,
+  z: a.z * n
+});
+
+const add = (a: Vec, b: Vec): Vec => ({
+  x: a.x + b.x,
+  y: a.y + b.y,
+  z: a.z + b.z
+});
+
+const mag = (a: Vec) => Math.hypot(a.x, a.y, a.z) || 1;
+const norm = (a: Vec) => mul(a, 1 / mag(a));
+
+const AU_KM = 149597870.7;
+const AU_SCENE = 5;
+const MOON_BOOST = 110;
+
+function calculate(date: Date) {
+  const t = new Astronomy.AstroTime(date);
+
+  const earth = mul(
+    v(Astronomy.HelioVector(Astronomy.Body.Earth, t)),
+    AU_SCENE
+  );
+
+  const moonGeo = v(
+    Astronomy.GeoVector(Astronomy.Body.Moon, t, true)
+  );
+
+  const sunGeo = v(
+    Astronomy.GeoVector(Astronomy.Body.Sun, t, true)
+  );
+
+  const moon = add(
+    earth,
+    mul(moonGeo, AU_SCENE * MOON_BOOST)
+  );
+
+  const phase = Astronomy.MoonPhase(t);
 
   return {
-    altitude: h.altitude,
-    azimuth: h.azimuth,
-    direction: new THREE.Vector3(
-      Math.sin(az) * Math.cos(alt),
-      Math.sin(alt),
-      -Math.cos(az) * Math.cos(alt)
-    ).normalize()
+    earth,
+    moon,
+    moonGeo,
+    phase,
+    illumination: (1 - Math.cos(phase * Math.PI / 180)) / 2,
+    sunDirection: norm(sunGeo)
   };
 }
 
-function Skyline() {
-  const buildings = useMemo(() => {
-    return Array.from({ length: 48 }, (_, i) => {
-      const angle = (i / 48) * Math.PI * 2;
-      const height = 1.2 + ((i * 17) % 11) * 0.24;
-      const width = 0.55 + ((i * 7) % 5) * 0.12;
-      const depth = 0.55 + ((i * 13) % 4) * 0.12;
-      const radius = 9 + (i % 3) * 0.7;
+/*
+ * Earth's orbit is sampled from Astronomy Engine.
+ * The orbit line and Earth position use the same
+ * heliocentric coordinate system.
+ */
+function OrbitPath({
+  date,
+  color
+}: {
+  date: Date;
+  color: string;
+}) {
+  const points = useMemo(
+    () =>
+      Array.from({ length: 367 }, (_, i) => {
+        const sampleDate = new Date(
+          date.getTime() + (i - 183) * 2 * 86400000
+        );
 
-      return {
-        key: i,
-        position: [
-          Math.sin(angle) * radius,
-          height / 2,
-          -Math.cos(angle) * radius
-        ] as [number, number, number],
-        size: [width, height, depth] as [number, number, number],
-        color: i % 4 === 0 ? '#34394b' : '#20283a',
-        windows: i % 3 === 0
-      };
-    });
-  }, []);
+        const position = Astronomy.HelioVector(
+          Astronomy.Body.Earth,
+          new Astronomy.AstroTime(sampleDate)
+        );
+
+        return [
+          position.x * AU_SCENE,
+          position.y * AU_SCENE,
+          position.z * AU_SCENE
+        ] as [number, number, number];
+      }),
+    [date.getFullYear()]
+  );
 
   return (
-    <group>
-      {buildings.map(b => (
-        <group key={b.key} position={b.position}>
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={b.size} />
-            <meshStandardMaterial color={b.color} roughness={0.92} />
-          </mesh>
-          {b.windows && (
-            <mesh position={[0, 0, b.size[2] / 2 + 0.006]}>
-              <planeGeometry args={[b.size[0] * 0.72, b.size[1] * 0.8]} />
-              <meshBasicMaterial color="#c69c59" transparent opacity={0.28} />
-            </mesh>
-          )}
-        </group>
-      ))}
-    </group>
+    <Line
+      points={points}
+      color={color}
+      transparent
+      opacity={0.55}
+      lineWidth={1.5}
+    />
   );
 }
 
-function CitySky({ date, place }: Props) {
-  const moon = useMemo(
-    () => horizontal(date, place, Astronomy.Body.Moon),
-    [date.getTime(), place.lat, place.lon]
+function Scene({
+  date,
+  mode,
+  place
+}: {
+  date: Date;
+  mode: string;
+  place: Place;
+}) {
+  const sky = useMemo(
+    () => calculate(date),
+    [date.getTime()]
   );
 
-  const sun = useMemo(
-    () => horizontal(date, place, Astronomy.Body.Sun),
-    [date.getTime(), place.lat, place.lon]
+  const earthRef = useRef<THREE.Group>(null);
+  const moonRef = useRef<THREE.Group>(null);
+  const controlsRef = useRef<any>(null);
+
+  const previousMoon = useRef(
+    new THREE.Vector3(sky.moon.x, sky.moon.y, sky.moon.z)
   );
 
-  const phase = Astronomy.MoonPhase(new Astronomy.AstroTime(date));
-  const illumination = (1 - Math.cos(phase * Math.PI / 180)) / 2;
+  /*
+   * Set the camera target when switching views.
+   * Moon mode opens with the Moon centred.
+   */
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
 
-  const moonPosition = moon.direction.clone().multiplyScalar(28);
-  const sunPosition = sun.direction.clone().multiplyScalar(45);
+    if (mode === 'moon') {
+      const moonTarget = new THREE.Vector3(
+        sky.moon.x,
+        sky.moon.y,
+        sky.moon.z
+      );
+
+      controls.target.copy(moonTarget);
+
+      controls.object.position
+        .copy(moonTarget)
+        .add(new THREE.Vector3(0, 0.32, 0.85));
+    } else if (mode === 'earth') {
+      const earthTarget = new THREE.Vector3(
+        sky.earth.x,
+        sky.earth.y,
+        sky.earth.z
+      );
+
+      controls.target.copy(earthTarget);
+
+      controls.object.position
+        .copy(earthTarget)
+        .add(new THREE.Vector3(0, 1.2, 2.8));
+    } else {
+      controls.target.set(0, 0, 0);
+      controls.object.position.set(0, 8, 12);
+    }
+
+    previousMoon.current.set(
+      sky.moon.x,
+      sky.moon.y,
+      sky.moon.z
+    );
+
+    controls.update();
+  }, [mode]);
+
+  useFrame(() => {
+    /*
+     * Keep the Moon camera centred as simulated time changes.
+     */
+    if (mode === 'moon' && controlsRef.current) {
+      const nextMoon = new THREE.Vector3(
+        sky.moon.x,
+        sky.moon.y,
+        sky.moon.z
+      );
+
+      const shift = nextMoon.clone().sub(previousMoon.current);
+
+      controlsRef.current.target.add(shift);
+      controlsRef.current.object.position.add(shift);
+
+      previousMoon.current.copy(nextMoon);
+      controlsRef.current.update();
+    }
+
+    const sidereal = Astronomy.SiderealTime(
+      new Astronomy.AstroTime(date)
+    );
+
+    if (earthRef.current) {
+      earthRef.current.rotation.y =
+        -(sidereal * Math.PI / 12);
+    }
+
+    if (moonRef.current) {
+      moonRef.current.rotation.y =
+        (date.getTime() / 86400000) *
+        (2 * Math.PI / 27.321661);
+    }
+  });
+
+  const e = sky.earth;
+  const m = sky.moon;
+  const s = sky.sunDirection;
+
+  const target: [number, number, number] =
+    mode === 'earth'
+      ? [e.x, e.y, e.z]
+      : mode === 'moon'
+        ? [m.x, m.y, m.z]
+        : [0, 0, 0];
+
+  const lat = place.lat * Math.PI / 180;
+  const lon = place.lon * Math.PI / 180;
+
+  const marker: [number, number, number] = [
+    Math.cos(lat) * Math.sin(lon) * 0.326,
+    Math.sin(lat) * 0.326,
+    Math.cos(lat) * Math.cos(lon) * 0.326
+  ];
 
   return (
     <>
-      <color attach="background" args={['#080e1c']} />
-      <fog attach="fog" args={['#101a2a', 24, 65]} />
-      <ambientLight intensity={0.16} />
+      <color attach="background" args={['#080b16']} />
+      <ambientLight intensity={0.18} />
 
       <directionalLight
-        position={[sunPosition.x, sunPosition.y, sunPosition.z]}
-        intensity={sun.altitude > -6 ? 1.8 : 0.08}
+        position={[s.x * 100, s.y * 100, s.z * 100]}
+        intensity={2.8}
       />
 
-      {moon.altitude > -2 && illumination > 0.02 && (
-        <directionalLight
-          position={[
-            moon.direction.x * 35,
-            moon.direction.y * 35,
-            moon.direction.z * 35
-          ]}
-          intensity={0.12 + illumination * 0.42}
-          color="#c5d5ff"
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-near={1}
-          shadow-camera-far={70}
-          shadow-camera-left={-24}
-          shadow-camera-right={24}
-          shadow-camera-top={24}
-          shadow-camera-bottom={-24}
-          shadow-bias={-0.0003}
-        />
-      )}
+      <Stars
+        radius={150}
+        depth={65}
+        count={3500}
+        factor={3}
+        saturation={0.15}
+        fade
+        speed={0.2}
+      />
 
-      <Stars radius={100} depth={55} count={2600} factor={2.5} saturation={0.15} fade speed={0.1} />
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
-        <circleGeometry args={[45, 96]} />
-        <meshStandardMaterial color="#111a23" roughness={1} />
+      <mesh>
+        <sphereGeometry args={[0.7, 48, 32]} />
+        <meshBasicMaterial color="#ffd27a" />
       </mesh>
 
-      <Skyline />
+      <OrbitPath date={date} color="#45536e" />
 
-      {moon.altitude > -5 && (
-        <group position={[
-          moonPosition.x,
-          moonPosition.y,
-          moonPosition.z
-        ]}>
-          <mesh>
-            <sphereGeometry args={[1.15, 96, 64]} />
-            <meshStandardMaterial color="#b9b9b4" roughness={1} />
-          </mesh>
-          <Html position={[0, 1.65, 0]} center>
-            <div className="city-moon-label">
-              MOON · {Math.round(illumination * 100)}% LIT
-            </div>
-          </Html>
-        </group>
-      )}
+      <Line
+        points={[
+          [e.x, e.y, e.z],
+          [m.x, m.y, m.z]
+        ]}
+        color="#8198b9"
+        transparent
+        opacity={0.35}
+        lineWidth={1}
+      />
 
-      {sun.altitude > -3 && (
-        <mesh position={[
-          sun.direction.x * 32,
-          sun.direction.y * 32,
-          sun.direction.z * 32
-        ]}>
-          <sphereGeometry args={[0.7, 32, 24]} />
-          <meshBasicMaterial color="#e9b96e" />
+      <group ref={earthRef} position={[e.x, e.y, e.z]}>
+        <mesh>
+          <sphereGeometry args={[0.32, 64, 48]} />
+          <meshStandardMaterial
+            color="#397fc0"
+            roughness={0.92}
+          />
         </mesh>
-      )}
+
+        <mesh scale={1.012}>
+          <sphereGeometry args={[0.32, 48, 32]} />
+          <meshBasicMaterial
+            color="#6eb6ff"
+            wireframe
+            transparent
+            opacity={0.035}
+          />
+        </mesh>
+
+        <mesh position={marker}>
+          <sphereGeometry args={[0.018, 16, 12]} />
+          <meshBasicMaterial color="#ffcf70" />
+        </mesh>
+
+        <mesh position={marker}>
+          <ringGeometry args={[0.025, 0.04, 32]} />
+          <meshBasicMaterial
+            color="#ffcf70"
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
+
+      <group ref={moonRef} position={[m.x, m.y, m.z]}>
+        <mesh>
+          <sphereGeometry args={[0.105, 64, 48]} />
+          <meshStandardMaterial
+            color="#c9c9c2"
+            roughness={1}
+          />
+        </mesh>
+      </group>
+
+      <Html position={[0, 0.95, 0]} center>
+        <span className="space-label sun-label">SUN</span>
+      </Html>
+
+      <Html position={[e.x, e.y + 0.52, e.z]} center>
+        <span className="space-label">
+          {place.name.toUpperCase()}
+        </span>
+      </Html>
+
+      <Html position={[m.x, m.y + 0.24, m.z]} center>
+        <span className="space-label">MOON</span>
+      </Html>
 
       <OrbitControls
+        ref={controlsRef}
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        target={[0, 2, 0]}
-        minDistance={4}
-        maxDistance={22}
-        maxPolarAngle={Math.PI / 2}
+        minDistance={mode === 'moon' ? 0.15 : 1.5}
+        maxDistance={mode === 'moon' ? 8 : 30}
+        target={target}
       />
     </>
   );
 }
 
-function normalizeAngle(angle: number) {
-  return ((angle + 540) % 360) - 180;
+const localInput = (d: Date) => {
+  const p = (n: number) => String(n).padStart(2, '0');
+
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+const dateKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function phaseName(angle: number) {
+  const p = (angle % 360 + 360) % 360;
+
+  if (p < 22.5 || p >= 337.5) return 'New Moon';
+  if (p < 67.5) return 'Waxing Crescent';
+  if (p < 112.5) return 'First Quarter';
+  if (p < 157.5) return 'Waxing Gibbous';
+  if (p < 202.5) return 'Full Moon';
+  if (p < 247.5) return 'Waning Gibbous';
+  if (p < 292.5) return 'Last Quarter';
+
+  return 'Waning Crescent';
 }
 
-export default function CityView({ date, place }: Props) {
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [heading, setHeading] = useState<number | null>(null);
-  const [pitch, setPitch] = useState(0);
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const moon = useMemo(
-    () => horizontal(date, place, Astronomy.Body.Moon),
-    [date.getTime(), place.lat, place.lon]
+function phaseInfo(date: Date) {
+  const angle = Astronomy.MoonPhase(
+    new Astronomy.AstroTime(date)
   );
 
-  const delta = heading === null
-    ? null
-    : normalizeAngle(moon.azimuth - heading);
+  return {
+    angle,
+    name: phaseName(angle),
+    illumination:
+      (1 - Math.cos(angle * Math.PI / 180)) / 2
+  };
+}
 
-  const markerX = delta === null
-    ? 50
-    : Math.max(5, Math.min(95, 50 + delta * 0.48));
-
-  const markerY = Math.max(
-    10,
-    Math.min(82, 50 - (moon.altitude - pitch) * 0.65)
+function riseSet(date: Date, place: Place) {
+  const observer = new Astronomy.Observer(
+    place.lat,
+    place.lon,
+    0
   );
 
+  const start = new Astronomy.AstroTime(
+    new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      0,
+      0,
+      0
+    )
+  );
+
+  const rise = Astronomy.SearchRiseSet(
+    Astronomy.Body.Moon,
+    observer,
+    +1,
+    start,
+    2
+  );
+
+  const set = Astronomy.SearchRiseSet(
+    Astronomy.Body.Moon,
+    observer,
+    -1,
+    start,
+    2
+  );
+
+  return {
+    rise: rise ? rise.date : null,
+    set: set ? set.date : null
+  };
+}
+
+function skyPosition(date: Date, place: Place) {
+  const observer = new Astronomy.Observer(
+    place.lat,
+    place.lon,
+    0
+  );
+
+  const time = new Astronomy.AstroTime(date);
+
+  const eq = Astronomy.Equator(
+    Astronomy.Body.Moon,
+    time,
+    observer,
+    true,
+    true
+  );
+
+  const hor = Astronomy.Horizon(
+    time,
+    observer,
+    eq.ra,
+    eq.dec,
+    'normal'
+  );
+
+  return {
+    altitude: hor.altitude,
+    azimuth: hor.azimuth
+  };
+}
+
+function timeLabel(d: Date | null) {
+  return d
+    ? d.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'No event';
+}
+
+function monthCells(year: number, month: number) {
+  const first = new Date(year, month, 1);
+  const start = first.getDay();
+  const count = new Date(year, month + 1, 0).getDate();
+
+  return [
+    ...Array(start).fill(null),
+    ...Array.from(
+      { length: count },
+      (_, i) => new Date(year, month, i + 1)
+    )
+  ];
+}
+
+export default function App() {
+  const [date, setDate] = useState(() => new Date());
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [mode, setMode] = useState('system');
+
+  const [place, setPlace] = useState<Place>(DEFAULT_PLACE);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Place[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [locationMessage, setLocationMessage] = useState('');
+
+  const [calendarMonth, setCalendarMonth] = useState(
+    () => new Date(date.getFullYear(), date.getMonth(), 1)
+  );
+
+  const [selectedDay, setSelectedDay] = useState(
+    () => new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    )
+  );
+
+  const [observerTime, setObserverTime] = useState(
+    () => new Date()
+  );
+
+  /*
+   * Continuous simulation clock.
+   *
+   * speed is simulated minutes per real second.
+   * requestAnimationFrame advances the clock every rendered
+   * frame instead of jumping once per second.
+   */
   useEffect(() => {
-    if (!cameraOpen) return;
+    if (!playing) return;
 
-    let active = true;
+    let frameId = 0;
+    let previousFrame = 0;
 
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: false
-        });
-
-        if (!active) {
-          stream.getTracks().forEach(track => track.stop());
-          return;
-        }
-
-        streamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } catch {
-        setCameraError(
-          'Camera access failed. Allow camera permission and use HTTPS.'
-        );
+    const animate = (timestamp: number) => {
+      if (previousFrame === 0) {
+        previousFrame = timestamp;
       }
+
+      // Avoid a giant catch-up jump after a suspended browser tab.
+      const elapsedSeconds = Math.min(
+        (timestamp - previousFrame) / 1000,
+        0.25
+      );
+
+      previousFrame = timestamp;
+
+      setDate(current =>
+        new Date(
+          current.getTime() +
+          elapsedSeconds * 60000 * speed
+        )
+      );
+
+      frameId = window.requestAnimationFrame(animate);
     };
 
-    void startCamera();
-
-    const onOrientation = (event: DeviceOrientationEvent) => {
-      const e = event as DeviceOrientationEvent & {
-        webkitCompassHeading?: number;
-      };
-
-      const compass = e.webkitCompassHeading;
-      const calculatedHeading = typeof compass === 'number'
-        ? compass
-        : typeof e.alpha === 'number'
-          ? (360 - e.alpha) % 360
-          : null;
-
-      if (calculatedHeading !== null) {
-        setHeading(calculatedHeading);
-      }
-
-      if (typeof e.beta === 'number') {
-        setPitch(e.beta - 90);
-      }
-    };
-
-    window.addEventListener('deviceorientation', onOrientation, true);
+    frameId = window.requestAnimationFrame(animate);
 
     return () => {
-      active = false;
-      window.removeEventListener('deviceorientation', onOrientation, true);
-      streamRef.current?.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+      window.cancelAnimationFrame(frameId);
     };
-  }, [cameraOpen]);
+  }, [playing, speed]);
 
-  const openCamera = async () => {
-    setCameraError('');
+  /*
+   * Only update the selected calendar day when the date
+   * actually crosses into a different local day.
+   * This avoids recalculating lunar rise/set every frame.
+   */
+  useEffect(() => {
+    setSelectedDay(current => {
+      const next = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      );
 
-    const DeviceOrientation = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
-      requestPermission?: () => Promise<string>;
-    };
+      return dateKey(current) === dateKey(next)
+        ? current
+        : next;
+    });
+  }, [date]);
 
-    if (typeof DeviceOrientation.requestPermission === 'function') {
-      try {
-        const permission = await DeviceOrientation.requestPermission();
-        if (permission !== 'granted') {
-          setCameraError(
-            'Motion permission was not granted. The camera can still open, but pointing guidance may be limited.'
-          );
-        }
-      } catch {
-        setCameraError('Could not request motion sensor permission.');
+  const sky = useMemo(
+    () => calculate(date),
+    [date.getTime()]
+  );
+
+  const distance = mag(sky.moonGeo) * AU_KM;
+
+  const events = useMemo(
+    () => riseSet(selectedDay, place),
+    [selectedDay.getTime(), place.lat, place.lon]
+  );
+
+  const position = useMemo(
+    () => skyPosition(observerTime, place),
+    [observerTime.getTime(), place.lat, place.lon]
+  );
+
+  const cells = useMemo(
+    () => monthCells(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth()
+    ),
+    [calendarMonth.getFullYear(), calendarMonth.getMonth()]
+  );
+
+  const searchCities = async () => {
+    if (!query.trim()) return;
+
+    setSearching(true);
+    setLocationMessage('');
+
+    try {
+      const response = await fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=en&format=json`
+      );
+
+      if (!response.ok) {
+        throw new Error('City search unavailable');
       }
+
+      const data = await response.json();
+
+      const found: Place[] = (
+        data.results || []
+      ).map((x: any) => ({
+        name: x.name,
+        country: x.country,
+        lat: x.latitude,
+        lon: x.longitude,
+        timezone: x.timezone
+      }));
+
+      setResults(found);
+
+      if (!found.length) {
+        setLocationMessage(
+          'No matching cities found. Try a nearby larger city.'
+        );
+      }
+    } catch {
+      setLocationMessage(
+        'Could not search cities right now. Check your connection and try again.'
+      );
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationMessage(
+        'This browser does not support location access.'
+      );
+      return;
     }
 
-    setCameraOpen(true);
+    setLocationMessage(
+      'Waiting for browser location permission…'
+    );
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+
+        setPlace({
+          name: 'My location',
+          lat: latitude,
+          lon: longitude
+        });
+
+        setLocationMessage(
+          `Location selected · ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+        );
+
+        setResults([]);
+      },
+      err => {
+        setLocationMessage(
+          err.code === 1
+            ? 'Location permission was denied. You can choose a city instead.'
+            : 'Could not determine your location. Try city search.'
+        );
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 12000
+      }
+    );
+  };
+
+  const choosePlace = (p: Place) => {
+    setPlace(p);
+    setResults([]);
+
+    setQuery(
+      `${p.name}${p.country ? `, ${p.country}` : ''}`
+    );
+
+    setLocationMessage(
+      `Observing from ${p.name}${p.country ? `, ${p.country}` : ''}`
+    );
+  };
+
+  const chooseCalendarDate = (d: Date) => {
+    setSelectedDay(d);
+
+    setDate(
+      new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate(),
+        12,
+        0
+      )
+    );
+  };
+
+  const selectedPhase = phaseInfo(selectedDay);
+  const livePhase = phaseInfo(observerTime);
+
+  const moveMonth = (delta: number) => {
+    setCalendarMonth(
+      d => new Date(
+        d.getFullYear(),
+        d.getMonth() + delta,
+        1
+      )
+    );
   };
 
   return (
-    <div className="city-view">
-      {!cameraOpen ? (
-        <>
-          <Canvas shadows camera={{ position: [0, 4, 14], fov: 58 }}>
-            <CitySky date={date} place={place} />
-          </Canvas>
+    <main className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">◉</span>
 
-          <div className="city-view-caption">
-            {place.name.toUpperCase()} · LIVE CELESTIAL POSITION
-          </div>
-
-          <button className="sky-camera-button" onClick={openCamera}>
-            ◎ OPEN SKY CAMERA
-          </button>
-        </>
-      ) : (
-        <div className="sky-camera">
-          <video
-            ref={videoRef}
-            className="sky-camera-video"
-            autoPlay
-            muted
-            playsInline
-          />
-
-          <div className="sky-camera-top">
-            <span>ORRERY / SKY FINDER</span>
-            <button onClick={() => setCameraOpen(false)}>CLOSE ×</button>
-          </div>
-
-          {/* The Moon target stays visible even when below the horizon
-              or visually obstructed by buildings, trees or clouds. */}
-          <div
-            className={`sky-moon-marker ${moon.altitude < 0 ? 'below-horizon' : ''}`}
-            style={{
-              left: `${markerX}%`,
-              top: `${markerY}%`
-            }}
-          >
-            <div className="sky-moon-crosshair">
-              {moon.altitude < 0 ? '↓' : '☾'}
+          <div>
+            <div className="brand-name">ORRERY</div>
+            <div className="brand-sub">
+              A LIVING MODEL OF THE SKY
             </div>
-            <span>{moon.altitude < 0 ? 'MOON · BELOW HORIZON' : 'MOON TARGET'}</span>
-          </div>
-
-          {delta !== null && Math.abs(delta) > 35 && (
-            <div className="sky-camera-instruction">
-              TURN {delta > 0 ? 'RIGHT' : 'LEFT'} TO FIND THE MOON
-            </div>
-          )}
-
-          <div className="sky-camera-data">
-            <span>AZIMUTH {moon.azimuth.toFixed(1)}°</span>
-            <span>ALTITUDE {moon.altitude.toFixed(1)}°</span>
-            <span>
-              {heading === null
-                ? 'COMPASS WAITING FOR SENSOR'
-                : `HEADING ${heading.toFixed(0)}°`}
-            </span>
-          </div>
-
-          {cameraError && (
-            <div className="sky-camera-error">{cameraError}</div>
-          )}
-
-          <div className="sky-camera-note">
-            Predicted astronomical target · visible through camera obstructions · sensor accuracy varies by device
           </div>
         </div>
-      )}
-    </div>
+
+        <div className="live-indicator">
+          <i /> EPHEMERIS ACTIVE
+        </div>
+      </header>
+
+      <section className="intro">
+        <div className="eyebrow">
+          THE CELESTIAL MECHANICS STUDIO
+        </div>
+
+        <h1>
+          Time is another
+          <br />
+          <em>dimension of space.</em>
+        </h1>
+
+        <p>
+          Explore the Sun, Earth and Moon — from any date,
+          beneath any sky.
+        </p>
+      </section>
+
+      <nav className="main-tabs">
+        {([
+          ['system', 'SYSTEM'],
+          ['earth', 'EARTH'],
+          ['moon', 'MOON'],
+          ['city', 'CITY OBSERVATORY']
+        ] as const).map(([val, label]) => (
+          <button
+            key={val}
+            className={mode === val ? 'active' : ''}
+            onClick={() => setMode(val)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <section className="viewport">
+        <div className="viewport-head">
+          <span>01 / CELESTIAL VIEW</span>
+          <span>
+            {mode === 'city'
+              ? 'GROUND-LEVEL · CITY SKY'
+              : mode === 'earth'
+                ? 'GLOBAL ATLAS · INTERACTIVE GLOBE'
+                : 'HELIOCENTRIC · 3D'}
+          </span>
+        </div>
+
+        {mode === 'city' ? (
+          <CityView date={observerTime} place={place} />
+        ) : mode === 'earth' ? (
+          <MapGlobe place={place} />
+        ) : (
+          <Canvas camera={{ position: [0, 8, 12], fov: 42 }}>
+            <Scene
+              date={date}
+              mode={mode}
+              place={place}
+            />
+          </Canvas>
+        )}
+
+        <div className="canvas-hint">
+          {mode === 'city'
+            ? 'DRAG TO LOOK AROUND · OPEN SKY CAMERA'
+            : mode === 'earth'
+              ? 'DRAG TO ROTATE · SCROLL TO ZOOM'
+              : 'DRAG TO ORBIT · SCROLL TO ZOOM'}
+        </div>
+      </section>
+
+      <section className="control-panel">
+        <div className="panel-title">
+          02 / TIME MACHINE
+          <span>
+            LOCAL TIME · {Intl.DateTimeFormat().resolvedOptions().timeZone}
+          </span>
+        </div>
+
+        <div className="time-row">
+          <input
+            aria-label="Date and time"
+            type="datetime-local"
+            value={localInput(date)}
+            onChange={e => {
+              if (e.target.value) {
+                setDate(new Date(e.target.value));
+              }
+            }}
+          />
+
+          <button
+            className="now-btn"
+            onClick={() => setDate(new Date())}
+          >
+            NOW
+          </button>
+        </div>
+
+        <div className="transport">
+          <button
+            onClick={() =>
+              setDate(d =>
+                new Date(d.getTime() - 86400000)
+              )
+            }
+          >
+            − 1 DAY
+          </button>
+
+          <button
+            className="play-btn"
+            onClick={() => setPlaying(x => !x)}
+          >
+            {playing ? 'Ⅱ PAUSE' : '▶ PLAY TIME'}
+          </button>
+
+          <button
+            onClick={() =>
+              setDate(d =>
+                new Date(d.getTime() + 86400000)
+              )
+            }
+          >
+            + 1 DAY
+          </button>
+
+          <select
+            aria-label="Time speed"
+            value={speed}
+            onChange={e => setSpeed(Number(e.target.value))}
+          >
+            <option value={1}>1 min/s</option>
+            <option value={60}>1 hour/s</option>
+            <option value={1440}>1 day/s</option>
+            <option value={10080}>1 week/s</option>
+            <option value={43200}>30 days/s</option>
+            <option value={144000}>100 days/s</option>
+          </select>
+        </div>
+      </section>
+
+      <section className="location-panel">
+        <div className="panel-title">
+          03 / OBSERVING LOCATION
+          <span>WORLDWIDE CITY SEARCH</span>
+        </div>
+
+        <div className="location-current">
+          <strong>
+            {place.name}
+            {place.country ? `, ${place.country}` : ''}
+          </strong>
+
+          <span>
+            {place.lat.toFixed(4)}°, {place.lon.toFixed(4)}°
+          </span>
+        </div>
+
+        <div className="location-actions">
+          <input
+            value={query}
+            placeholder="Search any city worldwide…"
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                void searchCities();
+              }
+            }}
+          />
+
+          <button
+            onClick={() => void searchCities()}
+            disabled={searching}
+          >
+            {searching ? 'SEARCHING…' : 'SEARCH CITY'}
+          </button>
+
+          <button
+            className="geo-btn"
+            onClick={useMyLocation}
+          >
+            ◎ USE MY LOCATION
+          </button>
+        </div>
+
+        {locationMessage && (
+          <p className="location-message">
+            {locationMessage}
+          </p>
+        )}
+
+        {results.length > 0 && (
+          <div className="city-results">
+            {results.map((p, i) => (
+              <button
+                key={`${p.name}-${p.lat}-${i}`}
+                onClick={() => choosePlace(p)}
+              >
+                <strong>{p.name}</strong>
+
+                <span>
+                  {p.country || 'Location'} ·
+                  {' '}{p.lat.toFixed(2)}, {p.lon.toFixed(2)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <p className="small-note">
+          Your browser asks permission before sharing your
+          location. ORRERY uses it only in this page to
+          calculate your local sky.
+        </p>
+      </section>
+
+      <section className="data-grid">
+        <article className="data-card phase-card">
+          <div className="card-kicker">
+            04 / LUNAR PHASE
+          </div>
+
+          <div className="phase-row">
+            <div className="moon-glyph">◐</div>
+
+            <div>
+              <h2>{phaseName(sky.phase)}</h2>
+
+              <p>
+                {(sky.illumination * 100).toFixed(1)}%
+                illuminated · {sky.phase.toFixed(1)}°
+                phase angle
+              </p>
+            </div>
+          </div>
+
+          <div className="meter">
+            <span
+              style={{
+                width: `${sky.illumination * 100}%`
+              }}
+            />
+          </div>
+        </article>
+
+        <article className="data-card">
+          <div className="card-kicker">
+            05 / EARTH–MOON
+          </div>
+
+          <h2>
+            {distance.toLocaleString('en-US', {
+              maximumFractionDigits: 0
+            })} km
+          </h2>
+
+          <p>Geocentric distance</p>
+        </article>
+
+        <article className="data-card">
+          <div className="card-kicker">
+            06 / SIMULATION DATE
+          </div>
+
+          <h2>
+            {date.toLocaleDateString(undefined, {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric'
+            })}
+          </h2>
+
+          <p>
+            {date.toLocaleTimeString(undefined, {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            })} · local
+          </p>
+        </article>
+      </section>
+
+      <section className="calendar-panel">
+        <div className="panel-title">
+          07 / LUNAR CALENDAR
+          <span>SELECT A DAY TO EXPLORE ITS MOON</span>
+        </div>
+
+        <div className="calendar-heading">
+          <button onClick={() => moveMonth(-1)}>←</button>
+
+          <h2>
+            {calendarMonth.toLocaleDateString(undefined, {
+              month: 'long',
+              year: 'numeric'
+            })}
+          </h2>
+
+          <button onClick={() => moveMonth(1)}>→</button>
+        </div>
+
+        <div className="calendar-grid">
+          {[
+            'SUN', 'MON', 'TUE', 'WED',
+            'THU', 'FRI', 'SAT'
+          ].map(x => (
+            <div className="weekday" key={x}>
+              {x}
+            </div>
+          ))}
+
+          {cells.map((d, i) => {
+            if (!d) {
+              return (
+                <div
+                  className="calendar-empty"
+                  key={`e${i}`}
+                />
+              );
+            }
+
+            const info = phaseInfo(d);
+            const chosen = dateKey(d) === dateKey(selectedDay);
+            const today = dateKey(d) === dateKey(new Date());
+
+            return (
+              <button
+                key={dateKey(d)}
+                className={`calendar-day ${chosen ? 'chosen' : ''} ${today ? 'today' : ''}`}
+                onClick={() => chooseCalendarDate(d)}
+              >
+                <span>{d.getDate()}</span>
+
+                <i>
+                  {info.illumination > 0.94
+                    ? '●'
+                    : info.illumination < 0.06
+                      ? '○'
+                      : info.angle < 180
+                        ? '◔'
+                        : '◕'}
+                </i>
+
+                <small>
+                  {Math.round(info.illumination * 100)}%
+                </small>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="calendar-detail">
+          <strong>
+            {selectedDay.toLocaleDateString(undefined, {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long'
+            })}
+          </strong>
+
+          <span>
+            {selectedPhase.name} ·
+            {' '}{(selectedPhase.illumination * 100).toFixed(1)}%
+            illuminated
+          </span>
+        </div>
+      </section>
+
+      <section className="city-panel">
+        <div className="panel-title">
+          08 / CITY OBSERVATORY
+          <span>{place.name.toUpperCase()}</span>
+        </div>
+
+        <div className="rise-set-grid">
+          <article>
+            <span>MOONRISE</span>
+            <strong>{timeLabel(events.rise)}</strong>
+          </article>
+
+          <article>
+            <span>MOONSET</span>
+            <strong>{timeLabel(events.set)}</strong>
+          </article>
+
+          <article>
+            <span>ILLUMINATION</span>
+            <strong>
+              {(livePhase.illumination * 100).toFixed(1)}%
+            </strong>
+          </article>
+        </div>
+
+        <div className="position-grid">
+          <article>
+            <span>ALTITUDE</span>
+            <strong>{position.altitude.toFixed(1)}°</strong>
+          </article>
+
+          <article>
+            <span>AZIMUTH</span>
+            <strong>{position.azimuth.toFixed(1)}°</strong>
+
+            <small>
+              {position.azimuth < 22.5 ||
+              position.azimuth >= 337.5
+                ? 'NORTH'
+                : position.azimuth < 67.5
+                  ? 'NORTH-EAST'
+                  : position.azimuth < 112.5
+                    ? 'EAST'
+                    : position.azimuth < 157.5
+                      ? 'SOUTH-EAST'
+                      : position.azimuth < 202.5
+                        ? 'SOUTH'
+                        : position.azimuth < 247.5
+                          ? 'SOUTH-WEST'
+                          : position.azimuth < 292.5
+                            ? 'WEST'
+                            : 'NORTH-WEST'}
+            </small>
+          </article>
+
+          <article>
+            <span>PHASE</span>
+            <strong>{livePhase.name}</strong>
+          </article>
+        </div>
+
+        <div className="observer-time">
+          <label>Inspect local sky at</label>
+
+          <input
+            type="datetime-local"
+            value={localInput(observerTime)}
+            onChange={e => {
+              if (e.target.value) {
+                setObserverTime(new Date(e.target.value));
+              }
+            }}
+          />
+
+          <button onClick={() => setObserverTime(new Date())}>
+            NOW
+          </button>
+        </div>
+
+        <p className="small-note">
+          Rise and set are calculated for the selected
+          date and observing coordinates. Times are shown
+          in your device's local timezone. Near the poles
+          or during unusual lunar cycles, an event may not
+          occur that day.
+        </p>
+      </section>
+
+      <footer>
+        <span>ORRERY / FIELD NOTES 002</span>
+
+        <span>
+          Ephemerides: Astronomy Engine · City search:
+          Open-Meteo Geocoding · Body sizes and Moon
+          distance visually exaggerated
+        </span>
+      </footer>
+    </main>
   );
 }
