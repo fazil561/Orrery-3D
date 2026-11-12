@@ -1,4 +1,4 @@
-
+import SharedMoonSurface from './MoonSurface';
 import CityView from './CityView';
 import MapGlobe from './MapGlobe';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -114,37 +114,7 @@ function calculate(date: Date) {
  * Falls back to the original grey material if loading fails.
  */
 function MoonSurface() {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-
-  useEffect(() => {
-    const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin('anonymous');
-
-    const loadedTexture = loader.load(
-      'https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg',
-      loaded => {
-        loaded.colorSpace = THREE.SRGBColorSpace;
-        loaded.anisotropy = 8;
-        setTexture(loaded);
-      },
-      undefined,
-      () => {
-        setTexture(null);
-      }
-    );
-
-    return () => {
-      loadedTexture.dispose();
-    };
-  }, []);
-
-  return (
-    <meshStandardMaterial
-      map={texture ?? undefined}
-      color={texture ? '#ffffff' : '#c9c9c2'}
-      roughness={1}
-    />
-  );
+  return <SharedMoonSurface />;
 }
 
 function OrbitPath({
