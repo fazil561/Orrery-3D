@@ -55,8 +55,6 @@ const OBLIQUITY = 23.4392911 * Math.PI / 180;
  * Astronomy Engine returns J2000 equatorial coordinates.
  * Convert them to ecliptic coordinates, then map the
  * ecliptic plane onto Three.js XZ.
- *
- * This keeps Earth's orbit in one clean, level plane.
  */
 function toEclipticScene(
   vector: { x: number; y: number; z: number },
@@ -109,6 +107,44 @@ function calculate(date: Date) {
     illumination: (1 - Math.cos(phase * Math.PI / 180)) / 2,
     sunDirection: norm(sunGeo)
   };
+}
+
+/*
+ * NASA lunar colour texture.
+ * Falls back to the original grey material if loading fails.
+ */
+function MoonSurface() {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+
+    const loadedTexture = loader.load(
+      'https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg',
+      loaded => {
+        loaded.colorSpace = THREE.SRGBColorSpace;
+        loaded.anisotropy = 8;
+        setTexture(loaded);
+      },
+      undefined,
+      () => {
+        setTexture(null);
+      }
+    );
+
+    return () => {
+      loadedTexture.dispose();
+    };
+  }, []);
+
+  return (
+    <meshStandardMaterial
+      map={texture ?? undefined}
+      color={texture ? '#ffffff' : '#c9c9c2'}
+      roughness={1}
+    />
+  );
 }
 
 function OrbitPath({
@@ -181,10 +217,6 @@ function Scene({
     new THREE.Vector3(sky.moon.x, sky.moon.y, sky.moon.z)
   );
 
-  /*
-   * Set the initial camera position when changing views
-   * or when the user presses the reset button.
-   */
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
@@ -206,10 +238,6 @@ function Scene({
         .copy(target)
         .add(new THREE.Vector3(0, 0.32, 0.9));
     } else {
-      /*
-       * A near top-down view makes the ecliptic plane
-       * appear straight and easy to understand.
-       */
       camera.up.set(0, 0, -1);
       controls.target.set(0, 0, 0);
       camera.position.set(0, 14, 0.01);
@@ -225,12 +253,6 @@ function Scene({
   }, [mode, resetKey]);
 
   useFrame(() => {
-    /*
-     * Moon tracking:
-     * Move both the camera and its target by the Moon's
-     * position change. The camera therefore keeps the
-     * Moon centred without interrupting the user's orbit.
-     */
     if (mode === 'moon' && controlsRef.current) {
       const nextMoon = new THREE.Vector3(
         sky.moon.x,
@@ -351,11 +373,8 @@ function Scene({
 
       <group ref={moonRef} position={[m.x, m.y, m.z]}>
         <mesh>
-          <sphereGeometry args={[0.105, 64, 48]} />
-          <meshStandardMaterial
-            color="#c9c9c2"
-            roughness={1}
-          />
+          <sphereGeometry args={[0.105, 96, 64]} />
+          <MoonSurface />
         </mesh>
       </group>
 
@@ -547,10 +566,6 @@ export default function App() {
     () => new Date()
   );
 
-  /*
-   * Continuous simulation clock.
-   * Speed is simulated minutes per real second.
-   */
   useEffect(() => {
     if (!playing) return;
 
