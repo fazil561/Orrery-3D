@@ -15,7 +15,7 @@ type Place = {
 type Props = {
   date: Date;
   place: Place;
-  resetKey: number;
+  resetKey?: number;
 };
 
 function horizontal(date: Date, place: Place, body: Astronomy.Body) {
@@ -80,7 +80,7 @@ function Skyline() {
   );
 }
 
-function CitySky({ date, place, resetKey }: Props) {
+function CitySky({ date, place, resetKey = 0 }: Props) {
   const controlsRef = useRef<any>(null);
 
   useEffect(() => {
@@ -148,11 +148,7 @@ function CitySky({ date, place, resetKey }: Props) {
         speed={0.1}
       />
 
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.08, 0]}
-        receiveShadow
-      >
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
         <circleGeometry args={[45, 96]} />
         <meshStandardMaterial color="#111a23" roughness={1} />
       </mesh>
@@ -209,7 +205,11 @@ function normalizeAngle(angle: number) {
   return ((angle + 540) % 360) - 180;
 }
 
-export default function CityView({ date, place, resetKey }: Props) {
+export default function CityView({
+  date,
+  place,
+  resetKey = 0
+}: Props) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [heading, setHeading] = useState<number | null>(null);
