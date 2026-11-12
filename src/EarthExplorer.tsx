@@ -1,3 +1,4 @@
+
 import './earth-explorer.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -34,20 +35,14 @@ function localDirections(place: Place, azimuth: number, altitude: number) {
     Math.cos(lat) * Math.cos(lon)
   ).normalize();
 
-  const east = new THREE.Vector3(
-    Math.cos(lon),
-    0,
-    -Math.sin(lon)
-  ).normalize();
-
+  const east = new THREE.Vector3(Math.cos(lon), 0, -Math.sin(lon)).normalize();
   const north = new THREE.Vector3(
     -Math.sin(lat) * Math.sin(lon),
     Math.cos(lat),
     -Math.sin(lat) * Math.cos(lon)
   ).normalize();
 
-  const direction = north
-    .clone()
+  const direction = north.clone()
     .multiplyScalar(Math.cos(alt) * Math.cos(az))
     .add(east.clone().multiplyScalar(Math.cos(alt) * Math.sin(az)))
     .add(up.clone().multiplyScalar(Math.sin(alt)))
@@ -59,27 +54,71 @@ function localDirections(place: Place, azimuth: number, altitude: number) {
 function getHorizontal(date: Date, place: Place, body: Astronomy.Body) {
   const observer = new Astronomy.Observer(place.lat, place.lon, 0);
   const time = new Astronomy.AstroTime(date);
-
-  const equatorial = Astronomy.Equator(
-    body,
-    time,
-    observer,
-    true,
-    true
-  );
-
-  const horizontal = Astronomy.Horizon(
-    time,
-    observer,
-    equatorial.ra,
-    equatorial.dec,
-    'normal'
-  );
+  const eq = Astronomy.Equator(body, time, observer, true, true);
+  const horizontal = Astronomy.Horizon(time, observer, eq.ra, eq.dec, 'normal');
 
   return {
     altitude: horizontal.altitude,
     azimuth: horizontal.azimuth
   };
+}
+
+/** A dotted circular orbital guide. */
+function DottedOrbit({
+  center,
+  radius,
+  color,
+  tilt = 0,
+  count = 240,
+  size = 0.035,
+  opacity = 0.8
+}: {
+  center: THREE.Vector3;
+  radius: number;
+  color: string;
+  tilt?: number;
+  count?: number;
+  size?: number;
+  opacity?: number;
+}) {
+  const points = useMemo(() => {
+    const positions = new Float32Array(count * 3);
+    const rotation = new THREE.Euler(tilt, 0, 0);
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const point = new THREE.Vector3(
+        Math.cos(angle) * radius,
+        0,
+        Math.sin(angle) * radius
+      ).applyEuler(rotation);
+
+      positions[i * 3] = point.x;
+      positions[i * 3 + 1] = point.y;
+      positions[i * 3 + 2] = point.z;
+    }
+
+    return positions;
+  }, [radius, tilt, count]);
+
+  return (
+    <points position={center.toArray()}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[points, 3]}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        color={color}
+        size={size}
+        transparent
+        opacity={opacity}
+        sizeAttenuation
+        depthWrite={false}
+      />
+    </points>
+  );
 }
 
 function EarthScene({
@@ -95,7 +134,6 @@ function EarthScene({
 }) {
   const controlsRef = useRef<any>(null);
   const transitionRef = useRef(false);
-
   const goalPosition = useRef(new THREE.Vector3());
   const goalTarget = useRef(new THREE.Vector3());
   const goalUp = useRef(new THREE.Vector3(0, 1, 0));
@@ -103,7 +141,6 @@ function EarthScene({
   const observer = useMemo(() => {
     const lat = THREE.MathUtils.degToRad(place.lat);
     const lon = THREE.MathUtils.degToRad(place.lon);
-
     return new THREE.Vector3(
       Math.cos(lat) * Math.sin(lon),
       Math.sin(lat),
@@ -114,7 +151,6 @@ function EarthScene({
   const north = useMemo(() => {
     const lat = THREE.MathUtils.degToRad(place.lat);
     const lon = THREE.MathUtils.degToRad(place.lon);
-
     return new THREE.Vector3(
       -Math.sin(lat) * Math.sin(lon),
       Math.cos(lat),
@@ -168,7 +204,7 @@ function EarthScene({
       goalUp.current.copy(observer);
     } else if (view === 'orbit') {
       goalPosition.current.copy(observer).multiplyScalar(4.5);
-      goalPosition.current.add(new THREE.Vector3(0, 1.0, 0));
+      goalPosition.current.add(new THREE.Vector3(0, 1, 0));
       goalTarget.current.set(0, 0, 0);
       goalUp.current.set(0, 1, 0);
     } else {
@@ -207,15 +243,23 @@ function EarthScene({
     controls.update();
   });
 
+  // In ground POV, the orbit guides are projected onto a distant sky sphere.
+  // In orbital and space POV, they surround the Earth and Sun respectively.
+  const groundGuides = view === 'ground';
+  const moonOrbitCenter = groundGuides
+    ? new THREE.Vector3(0, 0, 0)
+    : new THREE.Vector3(0, 0, 0);
+
+  const earthOrbitCenter = groundGuides
+    ? new THREE.Vector3(0, 0, 0)
+    : sunPosition;
+
   return (
     <>
       <color attach="background" args={['#050914']} />
       <ambientLight intensity={0.35} />
 
-      <directionalLight
-        position={sunPosition.toArray()}
-        intensity={3.1}
-      />
+      <directionalLight position={sunPosition.toArray()} intensity={3.1} />
 
       <Stars
         radius={120}
@@ -232,7 +276,7 @@ function EarthScene({
         <EarthSurface />
       </mesh>
 
-      {/* Observing location marker */}
+      {/* Observer marker */}
       <mesh position={observer.clone().multiplyScalar(1.009).toArray()}>
         <sphereGeometry args={[0.014, 16, 12]} />
         <meshBasicMaterial color="#ffd27a" />
@@ -246,20 +290,36 @@ function EarthScene({
         )}
       >
         <ringGeometry args={[0.022, 0.032, 40]} />
-        <meshBasicMaterial
-          color="#ffd27a"
-          side={THREE.DoubleSide}
-        />
+        <meshBasicMaterial color="#ffd27a" side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Moon: topocentric direction calculated for this observer */}
+      {/* Moon orbit: dotted path around Earth */}
+      <DottedOrbit
+        center={moonOrbitCenter}
+        radius={groundGuides ? 28 : 1.55}
+        color="#a9c8ef"
+        tilt={0.09}
+        count={260}
+        size={groundGuides ? 0.09 : 0.035}
+        opacity={0.9}
+      />
+
+      {/* Earth's solar orbit: dotted path around the Sun */}
+      <DottedOrbit
+        center={earthOrbitCenter}
+        radius={groundGuides ? 34 : 8}
+        color="#e6bd78"
+        tilt={groundGuides ? 0.42 : 0.05}
+        count={320}
+        size={groundGuides ? 0.085 : 0.045}
+        opacity={0.72}
+      />
+
+      {/* Moon */}
       <group position={moonPosition.toArray()}>
         <mesh>
           <sphereGeometry args={[0.27, 64, 48]} />
-          <meshStandardMaterial
-            color="#c8c6bd"
-            roughness={1}
-          />
+          <meshStandardMaterial color="#c8c6bd" roughness={1} />
         </mesh>
         <Html position={[0, 0.38, 0]} center>
           <span className="earth-body-label">
@@ -268,14 +328,14 @@ function EarthScene({
         </Html>
       </group>
 
-      {/* Sun: direction and altitude calculated for this observer */}
+      {/* Sun */}
       <group position={sunPosition.toArray()}>
         <mesh>
           <sphereGeometry args={[0.75, 48, 32]} />
           <meshBasicMaterial color="#ffd27a" />
         </mesh>
         <pointLight intensity={2.5} distance={0} />
-        <Html position={[0, 1.0, 0]} center>
+        <Html position={[0, 1, 0]} center>
           <span className="earth-body-label">SUN</span>
         </Html>
       </group>
@@ -301,11 +361,7 @@ function EarthScene({
   );
 }
 
-export default function EarthExplorer({
-  date,
-  place,
-  resetKey = 0
-}: Props) {
+export default function EarthExplorer({ date, place, resetKey = 0 }: Props) {
   const [view, setView] = useState<ViewMode>('orbit');
   const [showMap, setShowMap] = useState(false);
 
@@ -338,37 +394,44 @@ export default function EarthExplorer({
         />
       </Canvas>
 
-      <div className="earth-explorer-controls">
-        <div className="earth-mode-switch">
-          <button
-            className={view === 'ground' ? 'active' : ''}
-            onClick={() => setCameraView('ground')}
-          >
-            GROUND POV
-          </button>
-          <button
-            className={view === 'orbit' ? 'active' : ''}
-            onClick={() => setCameraView('orbit')}
-          >
-            ORBIT POV
-          </button>
-        </div>
+      <aside className="earth-explorer-controls">
+        <div className="earth-toolbar-heading">CAMERA</div>
 
-        <div className="earth-action-switch">
-          <button
-            onClick={() => setCameraView('space')}
-            className={view === 'space' ? 'active' : ''}
-          >
-            ↗ TAKE ME TO SPACE
-          </button>
-          <button
-            onClick={() => setShowMap(current => !current)}
-            className={showMap ? 'active' : ''}
-          >
-            {showMap ? 'RETURN TO 3D' : '◎ MAP ATLAS'}
-          </button>
+        <button
+          className={view === 'ground' ? 'active' : ''}
+          onClick={() => setCameraView('ground')}
+        >
+          <span>⌖</span> GROUND POV
+        </button>
+
+        <button
+          className={view === 'orbit' ? 'active' : ''}
+          onClick={() => setCameraView('orbit')}
+        >
+          <span>◉</span> ORBIT POV
+        </button>
+
+        <div className="earth-toolbar-divider" />
+
+        <button
+          className={view === 'space' ? 'active' : ''}
+          onClick={() => setCameraView('space')}
+        >
+          <span>↗</span> SPACE VIEW
+        </button>
+
+        <button
+          className={showMap ? 'active' : ''}
+          onClick={() => setShowMap(current => !current)}
+        >
+          <span>◎</span> MAP ATLAS
+        </button>
+
+        <div className="earth-toolbar-legend">
+          <div><i className="moon-orbit-dot" /> MOON ORBIT</div>
+          <div><i className="earth-orbit-dot" /> EARTH ORBIT</div>
         </div>
-      </div>
+      </aside>
 
       <div className="earth-explorer-readout">
         <span>{place.name.toUpperCase()}</span>
@@ -378,9 +441,7 @@ export default function EarthExplorer({
             timeStyle: 'short'
           })}
         </span>
-        <span>
-          MOON {moonLabel(date, place)}
-        </span>
+        <span>MOON {moonLabel(date, place)}</span>
       </div>
 
       <div className="earth-explorer-hint">
