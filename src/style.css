@@ -752,6 +752,31 @@ footer {
   50% { box-shadow: 0 0 28px #ffe2a2aa; }
 }
 
+.view-reset-button {
+  position: absolute;
+  z-index: 20;
+  top: 58px;
+  right: 18px;
+  padding: 10px 14px;
+  border: 1px solid rgba(210, 220, 245, 0.3);
+  border-radius: 6px;
+  background: rgba(8, 13, 26, 0.88);
+  color: #e5e9f3;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.view-reset-button:hover {
+  background: rgba(39, 55, 82, 0.95);
+  border-color: rgba(210, 220, 245, 0.65);
+}
+
+.viewport {
+  position: relative;
+}
+
 
 
 
