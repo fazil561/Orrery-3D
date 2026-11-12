@@ -731,3 +731,25 @@ footer {
   letter-spacing: .08em;
 }
 
+
+/* Persistent Sky Finder target */
+.sky-moon-marker {
+  z-index: 4;
+}
+
+.sky-moon-marker.below-horizon .sky-moon-crosshair {
+  border-style: dashed;
+  opacity: 0.8;
+  transform: rotate(180deg);
+}
+
+.sky-moon-crosshair {
+  animation: sky-target-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes sky-target-pulse {
+  0%, 100% { box-shadow: 0 0 12px #ffe2a244; }
+  50% { box-shadow: 0 0 28px #ffe2a2aa; }
+}
+
+
