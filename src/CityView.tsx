@@ -65,23 +65,12 @@ function Skyline() {
         <group key={b.key} position={b.position}>
           <mesh castShadow receiveShadow>
             <boxGeometry args={b.size} />
-            <meshStandardMaterial
-              color={b.color}
-              roughness={0.92}
-            />
+            <meshStandardMaterial color={b.color} roughness={0.92} />
           </mesh>
-
           {b.windows && (
             <mesh position={[0, 0, b.size[2] / 2 + 0.006]}>
-              <planeGeometry args={[
-                b.size[0] * 0.72,
-                b.size[1] * 0.8
-              ]} />
-              <meshBasicMaterial
-                color="#c69c59"
-                transparent
-                opacity={0.28}
-              />
+              <planeGeometry args={[b.size[0] * 0.72, b.size[1] * 0.8]} />
+              <meshBasicMaterial color="#c69c59" transparent opacity={0.28} />
             </mesh>
           )}
         </group>
@@ -111,7 +100,6 @@ function CitySky({ date, place }: Props) {
     <>
       <color attach="background" args={['#080e1c']} />
       <fog attach="fog" args={['#101a2a', 24, 65]} />
-
       <ambientLight intensity={0.16} />
 
       <directionalLight
@@ -119,8 +107,6 @@ function CitySky({ date, place }: Props) {
         intensity={sun.altitude > -6 ? 1.8 : 0.08}
       />
 
-      {/* Artificially enhanced moonlight for visible scene shadows.
-          Real moonlight is much dimmer than sunlight. */}
       {moon.altitude > -2 && illumination > 0.02 && (
         <directionalLight
           position={[
@@ -143,33 +129,15 @@ function CitySky({ date, place }: Props) {
         />
       )}
 
-      <Stars
-        radius={100}
-        depth={55}
-        count={2600}
-        factor={2.5}
-        saturation={0.15}
-        fade
-        speed={0.1}
-      />
+      <Stars radius={100} depth={55} count={2600} factor={2.5} saturation={0.15} fade speed={0.1} />
 
-      {/* Ground and horizon */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.08, 0]}
-        receiveShadow
-      >
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
         <circleGeometry args={[45, 96]} />
-        <meshStandardMaterial
-          color="#111a23"
-          roughness={1}
-        />
+        <meshStandardMaterial color="#111a23" roughness={1} />
       </mesh>
 
       <Skyline />
 
-      {/* The Moon: its illuminated face changes with the Sun's
-          actual direction, not a fixed decorative phase icon. */}
       {moon.altitude > -5 && (
         <group position={[
           moonPosition.x,
@@ -178,13 +146,8 @@ function CitySky({ date, place }: Props) {
         ]}>
           <mesh>
             <sphereGeometry args={[1.15, 96, 64]} />
-            <meshStandardMaterial
-              color="#b9b9b4"
-              roughness={1}
-              metalness={0}
-            />
+            <meshStandardMaterial color="#b9b9b4" roughness={1} />
           </mesh>
-
           <Html position={[0, 1.65, 0]} center>
             <div className="city-moon-label">
               MOON · {Math.round(illumination * 100)}% LIT
@@ -193,7 +156,6 @@ function CitySky({ date, place }: Props) {
         </group>
       )}
 
-      {/* Sun position is also calculated for the selected time. */}
       {sun.altitude > -3 && (
         <mesh position={[
           sun.direction.x * 32,
@@ -227,6 +189,7 @@ export default function CityView({ date, place }: Props) {
   const [cameraError, setCameraError] = useState('');
   const [heading, setHeading] = useState<number | null>(null);
   const [pitch, setPitch] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -244,7 +207,7 @@ export default function CityView({ date, place }: Props) {
     : Math.max(5, Math.min(95, 50 + delta * 0.48));
 
   const markerY = Math.max(
-    12,
+    10,
     Math.min(82, 50 - (moon.altitude - pitch) * 0.65)
   );
 
@@ -256,9 +219,7 @@ export default function CityView({ date, place }: Props) {
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' }
-          },
+          video: { facingMode: { ideal: 'environment' } },
           audio: false
         });
 
@@ -336,16 +297,11 @@ export default function CityView({ date, place }: Props) {
     setCameraOpen(true);
   };
 
-  const closeCamera = () => setCameraOpen(false);
-
   return (
     <div className="city-view">
       {!cameraOpen ? (
         <>
-          <Canvas
-            shadows
-            camera={{ position: [0, 4, 14], fov: 58 }}
-          >
+          <Canvas shadows camera={{ position: [0, 4, 14], fov: 58 }}>
             <CitySky date={date} place={place} />
           </Canvas>
 
@@ -369,31 +325,27 @@ export default function CityView({ date, place }: Props) {
 
           <div className="sky-camera-top">
             <span>ORRERY / SKY FINDER</span>
-            <button onClick={closeCamera}>CLOSE ×</button>
+            <button onClick={() => setCameraOpen(false)}>CLOSE ×</button>
           </div>
 
-          {moon.altitude > 0 ? (
-            <>
-              <div
-                className="sky-moon-marker"
-                style={{
-                  left: `${markerX}%`,
-                  top: `${markerY}%`
-                }}
-              >
-                <div className="sky-moon-crosshair">☾</div>
-                <span>MOON</span>
-              </div>
+          {/* The Moon target stays visible even when below the horizon
+              or visually obstructed by buildings, trees or clouds. */}
+          <div
+            className={`sky-moon-marker ${moon.altitude < 0 ? 'below-horizon' : ''}`}
+            style={{
+              left: `${markerX}%`,
+              top: `${markerY}%`
+            }}
+          >
+            <div className="sky-moon-crosshair">
+              {moon.altitude < 0 ? '↓' : '☾'}
+            </div>
+            <span>{moon.altitude < 0 ? 'MOON · BELOW HORIZON' : 'MOON TARGET'}</span>
+          </div>
 
-              {delta !== null && Math.abs(delta) > 35 && (
-                <div className="sky-camera-instruction">
-                  TURN {delta > 0 ? 'RIGHT' : 'LEFT'} TO FIND THE MOON
-                </div>
-              )}
-            </>
-          ) : (
+          {delta !== null && Math.abs(delta) > 35 && (
             <div className="sky-camera-instruction">
-              THE MOON IS BELOW THE HORIZON AT THIS TIME
+              TURN {delta > 0 ? 'RIGHT' : 'LEFT'} TO FIND THE MOON
             </div>
           )}
 
@@ -412,7 +364,7 @@ export default function CityView({ date, place }: Props) {
           )}
 
           <div className="sky-camera-note">
-            Predicted Moon position · camera does not detect the Moon through clouds
+            Predicted astronomical target · visible through camera obstructions · sensor accuracy varies by device
           </div>
         </div>
       )}
