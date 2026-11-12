@@ -1,5 +1,6 @@
 
 import CityView from './CityView';
+import MapGlobe from './MapGlobe';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars, Line, Html } from '@react-three/drei';
@@ -664,12 +665,16 @@ export default function App() {
           <span>
             {mode === 'city'
               ? 'GROUND-LEVEL · CITY SKY'
-              : 'HELIOCENTRIC · 3D'}
+              : mode === 'earth'
+                ? 'GLOBAL ATLAS · INTERACTIVE GLOBE'
+                : 'HELIOCENTRIC · 3D'}
           </span>
         </div>
 
         {mode === 'city' ? (
           <CityView date={observerTime} place={place} />
+        ) : mode === 'earth' ? (
+          <MapGlobe place={place} />
         ) : (
           <Canvas camera={{ position: [0, 8, 12], fov: 42 }}>
             <Scene
@@ -683,7 +688,9 @@ export default function App() {
         <div className="canvas-hint">
           {mode === 'city'
             ? 'DRAG TO LOOK AROUND · OPEN SKY CAMERA'
-            : 'DRAG TO ORBIT · SCROLL TO ZOOM'}
+            : mode === 'earth'
+              ? 'DRAG TO ROTATE · SCROLL TO ZOOM'
+              : 'DRAG TO ORBIT · SCROLL TO ZOOM'}
         </div>
       </section>
 
