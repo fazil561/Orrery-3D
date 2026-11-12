@@ -675,4 +675,59 @@ footer {
     text-align: center;
   }
 }
+  
 }
+
+/* ORRERY observer location marker */
+.orrery-location-pin {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.orrery-pin-pulse {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #ffd27a;
+  border-radius: 50%;
+  background: #ffd27a33;
+  box-shadow: 0 0 18px #ffd27a99;
+  animation: orrery-pin-pulse 2s ease-out infinite;
+}
+
+.orrery-pin-core {
+  position: relative;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff4d8;
+  border-radius: 50%;
+  background: #e9b96e;
+  box-shadow: 0 0 12px #ffd27a;
+}
+
+@keyframes orrery-pin-pulse {
+  0% { transform: scale(.6); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.orrery-pin-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #172033;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.orrery-pin-popup strong {
+  font-size: 13px;
+}
+
+.orrery-pin-popup span {
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .08em;
+}
+
