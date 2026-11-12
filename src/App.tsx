@@ -83,25 +83,37 @@ function calculate(date: Date) {
   };
 }
 
+/*
+ * Earth's orbit is sampled from Astronomy Engine.
+ * The orbit line and Earth position now use the same
+ * heliocentric coordinate system.
+ */
 function OrbitPath({
-  radius,
+  date,
   color
 }: {
-  radius: number;
+  date: Date;
   color: string;
 }) {
   const points = useMemo(
     () =>
-      Array.from({ length: 241 }, (_, i) => {
-        const a = (i / 240) * Math.PI * 2;
+      Array.from({ length: 367 }, (_, i) => {
+        const sampleDate = new Date(
+          date.getTime() + (i - 183) * 2 * 86400000
+        );
+
+        const position = Astronomy.HelioVector(
+          Astronomy.Body.Earth,
+          new Astronomy.AstroTime(sampleDate)
+        );
 
         return [
-          Math.cos(a) * radius,
-          0,
-          Math.sin(a) * radius
+          position.x * AU_SCENE,
+          position.y * AU_SCENE,
+          position.z * AU_SCENE
         ] as [number, number, number];
       }),
-    [radius]
+    [date.getFullYear()]
   );
 
   return (
@@ -109,8 +121,8 @@ function OrbitPath({
       points={points}
       color={color}
       transparent
-      opacity={0.4}
-      lineWidth={1}
+      opacity={0.55}
+      lineWidth={1.5}
     />
   );
 }
@@ -131,8 +143,78 @@ function Scene({
 
   const earthRef = useRef<THREE.Group>(null);
   const moonRef = useRef<THREE.Group>(null);
+  const controlsRef = useRef<any>(null);
+
+  const previousMoon = useRef(
+    new THREE.Vector3(sky.moon.x, sky.moon.y, sky.moon.z)
+  );
+
+  /*
+   * Set the camera target when switching views.
+   * Moon mode opens with the Moon centred.
+   */
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    if (mode === 'moon') {
+      const moonTarget = new THREE.Vector3(
+        sky.moon.x,
+        sky.moon.y,
+        sky.moon.z
+      );
+
+      controls.target.copy(moonTarget);
+
+      controls.object.position
+        .copy(moonTarget)
+        .add(new THREE.Vector3(0, 0.32, 0.85));
+    } else if (mode === 'earth') {
+      const earthTarget = new THREE.Vector3(
+        sky.earth.x,
+        sky.earth.y,
+        sky.earth.z
+      );
+
+      controls.target.copy(earthTarget);
+
+      controls.object.position
+        .copy(earthTarget)
+        .add(new THREE.Vector3(0, 1.2, 2.8));
+    } else {
+      controls.target.set(0, 0, 0);
+      controls.object.position.set(0, 8, 12);
+    }
+
+    previousMoon.current.set(
+      sky.moon.x,
+      sky.moon.y,
+      sky.moon.z
+    );
+
+    controls.update();
+  }, [mode]);
 
   useFrame(() => {
+    /*
+     * Keep the Moon camera centred as simulated time changes.
+     */
+    if (mode === 'moon' && controlsRef.current) {
+      const nextMoon = new THREE.Vector3(
+        sky.moon.x,
+        sky.moon.y,
+        sky.moon.z
+      );
+
+      const shift = nextMoon.clone().sub(previousMoon.current);
+
+      controlsRef.current.target.add(shift);
+      controlsRef.current.object.position.add(shift);
+
+      previousMoon.current.copy(nextMoon);
+      controlsRef.current.update();
+    }
+
     const sidereal = Astronomy.SiderealTime(
       new Astronomy.AstroTime(date)
     );
@@ -194,7 +276,7 @@ function Scene({
         <meshBasicMaterial color="#ffd27a" />
       </mesh>
 
-      <OrbitPath radius={5} color="#45536e" />
+      <OrbitPath date={date} color="#45536e" />
 
       <Line
         points={[
@@ -265,11 +347,12 @@ function Scene({
       </Html>
 
       <OrbitControls
+        ref={controlsRef}
         makeDefault
         enableDamping
         dampingFactor={0.08}
-        minDistance={1.5}
-        maxDistance={30}
+        minDistance={mode === 'moon' ? 0.15 : 1.5}
+        maxDistance={mode === 'moon' ? 8 : 30}
         target={target}
       />
     </>
