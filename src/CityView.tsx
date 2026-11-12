@@ -4,6 +4,7 @@ import { Canvas } from '@react-three/fiber';
 import { Html, OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import * as Astronomy from 'astronomy-engine';
+import MoonSurface from './MoonSurface';
 
 type Place = {
   name: string;
@@ -138,8 +139,8 @@ function CitySky({ date, place, resetKey = 0 }: Props) {
       {moon.altitude > -5 && (
         <group position={[moonPosition.x, moonPosition.y, moonPosition.z]}>
           <mesh>
-            <sphereGeometry args={[1.15, 96, 64]} />
-            <meshStandardMaterial color="#b9b9b4" roughness={1} />
+            <sphereGeometry args={[1.15, 128, 96]} />
+            <MoonSurface />
           </mesh>
           <Html position={[0, 1.65, 0]} center>
             <div className="city-moon-label">
