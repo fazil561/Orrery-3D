@@ -93,11 +93,15 @@ h1 em {
   box-shadow: 0 25px 80px #0006;
 }
 
-.viewport canvas { width: 100%; height: 100%; display: block; }
+.viewport canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 .viewport-head {
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   left: 20px;
   right: 20px;
   top: 17px;
@@ -139,9 +143,10 @@ h1 em {
 
 .canvas-hint {
   position: absolute;
+  z-index: 5;
   bottom: 17px;
   left: 20px;
-  color: #66748e;
+  color: #8794aa;
   font-size: 9px;
   pointer-events: none;
 }
@@ -227,7 +232,11 @@ h1 em {
   overflow: hidden;
 }
 
-.meter span { display: block; height: 100%; background: #d6b879; }
+.meter span {
+  display: block;
+  height: 100%;
+  background: #d6b879;
+}
 
 footer {
   display: flex;
@@ -418,10 +427,177 @@ footer {
 
 .observer-time label { color: #9ba7bd; font-size: 12px; }
 
+/* City Observatory and sky camera */
+
+.city-view {
+  position: absolute;
+  inset: 0;
+  background: #080e1c;
+}
+
+.city-view canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.city-view-caption {
+  position: absolute;
+  bottom: 17px;
+  left: 20px;
+  color: #9aa8c0;
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .12em;
+  pointer-events: none;
+}
+
+.sky-camera-button {
+  position: absolute;
+  z-index: 6;
+  right: 18px;
+  bottom: 48px;
+  border: 1px solid #b99b63;
+  border-radius: 7px;
+  padding: 12px 15px;
+  color: #f0d49d;
+  background: #101729e8;
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .08em;
+}
+
+.city-moon-label {
+  white-space: nowrap;
+  color: #f2dfb7;
+  background: #080e1cbb;
+  border: 1px solid #6b7890;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .08em;
+}
+
+.sky-camera {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #050812;
+  color: white;
+}
+
+.sky-camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sky-camera-top {
+  position: absolute;
+  top: 18px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .12em;
+  text-shadow: 0 1px 6px #000;
+}
+
+.sky-camera-top button {
+  background: #080e1ccc;
+  color: white;
+  border: 1px solid #8994a5;
+  border-radius: 5px;
+  padding: 8px 12px;
+}
+
+.sky-moon-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  color: #ffe2a2;
+  font: 10px 'DM Mono', monospace;
+  text-shadow: 0 1px 6px black;
+  pointer-events: none;
+}
+
+.sky-moon-crosshair {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ffe2a2;
+  border-radius: 50%;
+  background: #10172966;
+  font-size: 30px;
+  box-shadow: 0 0 22px #ffe2a255;
+}
+
+.sky-camera-instruction {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 45%;
+  text-align: center;
+  padding: 12px;
+  background: #080e1cbb;
+  color: #ffe2a2;
+  font: 10px 'DM Mono', monospace;
+  letter-spacing: .1em;
+}
+
+.sky-camera-data {
+  position: absolute;
+  bottom: 36px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 13px 8px;
+  background: #080e1cdd;
+  border: 1px solid #34415a;
+  border-radius: 7px;
+  font: 9px 'DM Mono', monospace;
+}
+
+.sky-camera-note {
+  position: absolute;
+  bottom: 9px;
+  left: 10px;
+  right: 10px;
+  text-align: center;
+  color: #c1cada;
+  font-size: 9px;
+}
+
+.sky-camera-error {
+  position: absolute;
+  top: 75px;
+  left: 12px;
+  right: 12px;
+  padding: 10px;
+  background: #421e25e8;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
 @media (max-width: 700px) {
-  .app-shell { width: calc(100% - 24px); padding-top: 16px; }
+  .app-shell {
+    width: calc(100% - 24px);
+    padding-top: 16px;
+  }
+
   .intro { padding: 38px 0 22px; }
-  .viewport { height: 430px; min-height: 330px; }
+
+  .viewport {
+    height: 430px;
+    min-height: 330px;
+  }
+
   .viewport-head { font-size: 8px; }
   .view-switch { top: auto; bottom: 45px; right: 12px; }
   .data-grid { grid-template-columns: 1fr; }
@@ -434,4 +610,6 @@ footer {
   .calendar-day { min-height: 54px; }
   .calendar-empty { min-height: 54px; }
   .calendar-detail { flex-direction: column; }
+  .sky-camera-data { justify-content: center; }
+  .sky-camera-button { right: 12px; bottom: 42px; }
 }
