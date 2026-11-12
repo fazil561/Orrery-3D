@@ -1,3 +1,4 @@
+
 import CityView from './CityView';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -42,7 +43,6 @@ const add = (a: Vec, b: Vec): Vec => ({
 });
 
 const mag = (a: Vec) => Math.hypot(a.x, a.y, a.z) || 1;
-
 const norm = (a: Vec) => mul(a, 1 / mag(a));
 
 const AU_KM = 149597870.7;
@@ -153,7 +153,7 @@ function Scene({
   const s = sky.sunDirection;
 
   const target: [number, number, number] =
-    mode === 'earth' || mode === 'city'
+    mode === 'earth'
       ? [e.x, e.y, e.z]
       : mode === 'moon'
         ? [m.x, m.y, m.z]
@@ -171,15 +171,10 @@ function Scene({
   return (
     <>
       <color attach="background" args={['#080b16']} />
-
       <ambientLight intensity={0.18} />
 
       <directionalLight
-        position={[
-          s.x * 100,
-          s.y * 100,
-          s.z * 100
-        ]}
+        position={[s.x * 100, s.y * 100, s.z * 100]}
         intensity={2.8}
       />
 
@@ -211,10 +206,7 @@ function Scene({
         lineWidth={1}
       />
 
-      <group
-        ref={earthRef}
-        position={[e.x, e.y, e.z]}
-      >
+      <group ref={earthRef} position={[e.x, e.y, e.z]}>
         <mesh>
           <sphereGeometry args={[0.32, 64, 48]} />
           <meshStandardMaterial
@@ -247,10 +239,7 @@ function Scene({
         </mesh>
       </group>
 
-      <group
-        ref={moonRef}
-        position={[m.x, m.y, m.z]}
-      >
+      <group ref={moonRef} position={[m.x, m.y, m.z]}>
         <mesh>
           <sphereGeometry args={[0.105, 64, 48]} />
           <meshStandardMaterial
@@ -261,27 +250,17 @@ function Scene({
       </group>
 
       <Html position={[0, 0.95, 0]} center>
-        <span className="space-label sun-label">
-          SUN
-        </span>
+        <span className="space-label sun-label">SUN</span>
       </Html>
 
-      <Html
-        position={[e.x, e.y + 0.52, e.z]}
-        center
-      >
+      <Html position={[e.x, e.y + 0.52, e.z]} center>
         <span className="space-label">
           {place.name.toUpperCase()}
         </span>
       </Html>
 
-      <Html
-        position={[m.x, m.y + 0.24, m.z]}
-        center
-      >
-        <span className="space-label">
-          MOON
-        </span>
+      <Html position={[m.x, m.y + 0.24, m.z]} center>
+        <span className="space-label">MOON</span>
       </Html>
 
       <OrbitControls
@@ -297,8 +276,7 @@ function Scene({
 }
 
 const localInput = (d: Date) => {
-  const p = (n: number) =>
-    String(n).padStart(2, '0');
+  const p = (n: number) => String(n).padStart(2, '0');
 
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
@@ -382,7 +360,6 @@ function skyPosition(date: Date, place: Place) {
 
   const time = new Astronomy.AstroTime(date);
 
-  // Corrected: Equator requires five arguments.
   const eq = Astronomy.Equator(
     Astronomy.Body.Moon,
     time,
@@ -487,20 +464,12 @@ export default function App() {
 
   const events = useMemo(
     () => riseSet(selectedDay, place),
-    [
-      selectedDay.getTime(),
-      place.lat,
-      place.lon
-    ]
+    [selectedDay.getTime(), place.lat, place.lon]
   );
 
   const position = useMemo(
     () => skyPosition(observerTime, place),
-    [
-      observerTime.getTime(),
-      place.lat,
-      place.lon
-    ]
+    [observerTime.getTime(), place.lat, place.lon]
   );
 
   const cells = useMemo(
@@ -508,10 +477,7 @@ export default function App() {
       calendarMonth.getFullYear(),
       calendarMonth.getMonth()
     ),
-    [
-      calendarMonth.getFullYear(),
-      calendarMonth.getMonth()
-    ]
+    [calendarMonth.getFullYear(), calendarMonth.getMonth()]
   );
 
   const searchCities = async () => {
@@ -695,19 +661,29 @@ export default function App() {
       <section className="viewport">
         <div className="viewport-head">
           <span>01 / CELESTIAL VIEW</span>
-          <span>HELIOCENTRIC · 3D</span>
+          <span>
+            {mode === 'city'
+              ? 'GROUND-LEVEL · CITY SKY'
+              : 'HELIOCENTRIC · 3D'}
+          </span>
         </div>
 
-        <Canvas camera={{ position: [0, 8, 12], fov: 42 }}>
-          <Scene
-            date={date}
-            mode={mode}
-            place={place}
-          />
-        </Canvas>
+        {mode === 'city' ? (
+          <CityView date={observerTime} place={place} />
+        ) : (
+          <Canvas camera={{ position: [0, 8, 12], fov: 42 }}>
+            <Scene
+              date={date}
+              mode={mode}
+              place={place}
+            />
+          </Canvas>
+        )}
 
         <div className="canvas-hint">
-          DRAG TO ORBIT · SCROLL TO ZOOM
+          {mode === 'city'
+            ? 'DRAG TO LOOK AROUND · OPEN SKY CAMERA'
+            : 'DRAG TO ORBIT · SCROLL TO ZOOM'}
         </div>
       </section>
 
@@ -770,9 +746,7 @@ export default function App() {
           <select
             aria-label="Time speed"
             value={speed}
-            onChange={e =>
-              setSpeed(Number(e.target.value))
-            }
+            onChange={e => setSpeed(Number(e.target.value))}
           >
             <option value={1}>1×</option>
             <option value={60}>1 min/s</option>
@@ -931,9 +905,7 @@ export default function App() {
         </div>
 
         <div className="calendar-heading">
-          <button onClick={() => moveMonth(-1)}>
-            ←
-          </button>
+          <button onClick={() => moveMonth(-1)}>←</button>
 
           <h2>
             {calendarMonth.toLocaleDateString(undefined, {
@@ -942,9 +914,7 @@ export default function App() {
             })}
           </h2>
 
-          <button onClick={() => moveMonth(1)}>
-            →
-          </button>
+          <button onClick={() => moveMonth(1)}>→</button>
         </div>
 
         <div className="calendar-grid">
@@ -968,11 +938,8 @@ export default function App() {
             }
 
             const info = phaseInfo(d);
-            const chosen =
-              dateKey(d) === dateKey(selectedDay);
-
-            const today =
-              dateKey(d) === dateKey(new Date());
+            const chosen = dateKey(d) === dateKey(selectedDay);
+            const today = dateKey(d) === dateKey(new Date());
 
             return (
               <button
@@ -1045,16 +1012,12 @@ export default function App() {
         <div className="position-grid">
           <article>
             <span>ALTITUDE</span>
-            <strong>
-              {position.altitude.toFixed(1)}°
-            </strong>
+            <strong>{position.altitude.toFixed(1)}°</strong>
           </article>
 
           <article>
             <span>AZIMUTH</span>
-            <strong>
-              {position.azimuth.toFixed(1)}°
-            </strong>
+            <strong>{position.azimuth.toFixed(1)}°</strong>
 
             <small>
               {position.azimuth < 22.5 ||
@@ -1090,16 +1053,12 @@ export default function App() {
             value={localInput(observerTime)}
             onChange={e => {
               if (e.target.value) {
-                setObserverTime(
-                  new Date(e.target.value)
-                );
+                setObserverTime(new Date(e.target.value));
               }
             }}
           />
 
-          <button
-            onClick={() => setObserverTime(new Date())}
-          >
+          <button onClick={() => setObserverTime(new Date())}>
             NOW
           </button>
         </div>
