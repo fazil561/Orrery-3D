@@ -84,9 +84,7 @@ function CitySky({ date, place, resetKey = 0 }: Props) {
   const controlsRef = useRef<any>(null);
 
   useEffect(() => {
-    if (resetKey > 0) {
-      controlsRef.current?.reset();
-    }
+    controlsRef.current?.reset();
   }, [resetKey]);
 
   const moon = useMemo(
@@ -125,28 +123,10 @@ function CitySky({ date, place, resetKey = 0 }: Props) {
           ]}
           intensity={0.12 + illumination * 0.42}
           color="#c5d5ff"
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-near={1}
-          shadow-camera-far={70}
-          shadow-camera-left={-24}
-          shadow-camera-right={24}
-          shadow-camera-top={24}
-          shadow-camera-bottom={-24}
-          shadow-bias={-0.0003}
         />
       )}
 
-      <Stars
-        radius={100}
-        depth={55}
-        count={2600}
-        factor={2.5}
-        saturation={0.15}
-        fade
-        speed={0.1}
-      />
+      <Stars radius={100} depth={55} count={2600} factor={2.5} saturation={0.15} fade speed={0.1} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow>
         <circleGeometry args={[45, 96]} />
@@ -156,11 +136,7 @@ function CitySky({ date, place, resetKey = 0 }: Props) {
       <Skyline />
 
       {moon.altitude > -5 && (
-        <group position={[
-          moonPosition.x,
-          moonPosition.y,
-          moonPosition.z
-        ]}>
+        <group position={[moonPosition.x, moonPosition.y, moonPosition.z]}>
           <mesh>
             <sphereGeometry args={[1.15, 96, 64]} />
             <meshStandardMaterial color="#b9b9b4" roughness={1} />
@@ -174,11 +150,7 @@ function CitySky({ date, place, resetKey = 0 }: Props) {
       )}
 
       {sun.altitude > -3 && (
-        <mesh position={[
-          sun.direction.x * 32,
-          sun.direction.y * 32,
-          sun.direction.z * 32
-        ]}>
+        <mesh position={[sun.direction.x * 32, sun.direction.y * 32, sun.direction.z * 32]}>
           <sphereGeometry args={[0.7, 32, 24]} />
           <meshBasicMaterial color="#e9b96e" />
         </mesh>
@@ -205,11 +177,7 @@ function normalizeAngle(angle: number) {
   return ((angle + 540) % 360) - 180;
 }
 
-export default function CityView({
-  date,
-  place,
-  resetKey = 0
-}: Props) {
+export default function CityView({ date, place, resetKey = 0 }: Props) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [heading, setHeading] = useState<number | null>(null);
@@ -223,9 +191,7 @@ export default function CityView({
     [date.getTime(), place.lat, place.lon]
   );
 
-  const delta = heading === null
-    ? null
-    : normalizeAngle(moon.azimuth - heading);
+  const delta = heading === null ? null : normalizeAngle(moon.azimuth - heading);
 
   const markerX = delta === null
     ? 50
@@ -260,9 +226,7 @@ export default function CityView({
           await videoRef.current.play();
         }
       } catch {
-        setCameraError(
-          'Camera access failed. Allow camera permission and use HTTPS.'
-        );
+        setCameraError('Camera access failed. Allow camera permission and use HTTPS.');
       }
     };
 
@@ -280,13 +244,8 @@ export default function CityView({
           ? (360 - e.alpha) % 360
           : null;
 
-      if (calculatedHeading !== null) {
-        setHeading(calculatedHeading);
-      }
-
-      if (typeof e.beta === 'number') {
-        setPitch(e.beta - 90);
-      }
+      if (calculatedHeading !== null) setHeading(calculatedHeading);
+      if (typeof e.beta === 'number') setPitch(e.beta - 90);
     };
 
     window.addEventListener('deviceorientation', onOrientation, true);
@@ -310,9 +269,7 @@ export default function CityView({
       try {
         const permission = await DeviceOrientation.requestPermission();
         if (permission !== 'granted') {
-          setCameraError(
-            'Motion permission was not granted. The camera can still open, but pointing guidance may be limited.'
-          );
+          setCameraError('Motion permission was not granted. Pointing guidance may be limited.');
         }
       } catch {
         setCameraError('Could not request motion sensor permission.');
@@ -340,13 +297,7 @@ export default function CityView({
         </>
       ) : (
         <div className="sky-camera">
-          <video
-            ref={videoRef}
-            className="sky-camera-video"
-            autoPlay
-            muted
-            playsInline
-          />
+          <video ref={videoRef} className="sky-camera-video" autoPlay muted playsInline />
 
           <div className="sky-camera-top">
             <span>ORRERY / SKY FINDER</span>
@@ -355,19 +306,12 @@ export default function CityView({
 
           <div
             className={`sky-moon-marker ${moon.altitude < 0 ? 'below-horizon' : ''}`}
-            style={{
-              left: `${markerX}%`,
-              top: `${markerY}%`
-            }}
+            style={{ left: `${markerX}%`, top: `${markerY}%` }}
           >
             <div className="sky-moon-crosshair">
               {moon.altitude < 0 ? '↓' : '☾'}
             </div>
-            <span>
-              {moon.altitude < 0
-                ? 'MOON · BELOW HORIZON'
-                : 'MOON TARGET'}
-            </span>
+            <span>{moon.altitude < 0 ? 'MOON · BELOW HORIZON' : 'MOON TARGET'}</span>
           </div>
 
           {delta !== null && Math.abs(delta) > 35 && (
@@ -379,16 +323,10 @@ export default function CityView({
           <div className="sky-camera-data">
             <span>AZIMUTH {moon.azimuth.toFixed(1)}°</span>
             <span>ALTITUDE {moon.altitude.toFixed(1)}°</span>
-            <span>
-              {heading === null
-                ? 'COMPASS WAITING FOR SENSOR'
-                : `HEADING ${heading.toFixed(0)}°`}
-            </span>
+            <span>{heading === null ? 'COMPASS WAITING FOR SENSOR' : `HEADING ${heading.toFixed(0)}°`}</span>
           </div>
 
-          {cameraError && (
-            <div className="sky-camera-error">{cameraError}</div>
-          )}
+          {cameraError && <div className="sky-camera-error">{cameraError}</div>}
 
           <div className="sky-camera-note">
             Predicted astronomical target · visible through camera obstructions · sensor accuracy varies by device
