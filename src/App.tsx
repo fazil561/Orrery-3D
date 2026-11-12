@@ -53,11 +53,6 @@ const AU_SCENE = 5;
 const MOON_BOOST = 110;
 const OBLIQUITY = 23.4392911 * Math.PI / 180;
 
-/*
- * Astronomy Engine returns J2000 equatorial coordinates.
- * Convert them to ecliptic coordinates, then map the
- * ecliptic plane onto Three.js XZ.
- */
 function toEclipticScene(
   vector: { x: number; y: number; z: number },
   scale = 1
@@ -115,6 +110,7 @@ function MoonSurface() {
   return <SharedMoonSurface />;
 }
 
+/** Dotted path of Earth around the Sun. */
 function OrbitPath({
   date,
   color
@@ -155,8 +151,53 @@ function OrbitPath({
       points={points}
       color={color}
       transparent
-      opacity={0.55}
+      opacity={0.8}
       lineWidth={1.5}
+      dashed
+      dashSize={0.09}
+      gapSize={0.07}
+      dashScale={1}
+    />
+  );
+}
+
+/** Dotted Moon orbit around the Earth. */
+function MoonOrbitPath({ earth }: { earth: Vec }) {
+  const points = useMemo(
+    () =>
+      Array.from({ length: 361 }, (_, i) => {
+        const angle = (i / 360) * Math.PI * 2;
+
+        // Visually exaggerated Moon orbit to remain readable.
+        const radius = 1.42;
+        const inclination = THREE.MathUtils.degToRad(5.1);
+
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+
+        const y = z * Math.sin(inclination);
+        const adjustedZ = z * Math.cos(inclination);
+
+        return [
+          earth.x + x,
+          earth.y + y,
+          earth.z + adjustedZ
+        ] as [number, number, number];
+      }),
+    [earth.x, earth.y, earth.z]
+  );
+
+  return (
+    <Line
+      points={points}
+      color="#a9c8ef"
+      transparent
+      opacity={0.9}
+      lineWidth={1.5}
+      dashed
+      dashSize={0.045}
+      gapSize={0.045}
+      dashScale={1}
     />
   );
 }
@@ -288,13 +329,19 @@ function Scene({
         speed={0.2}
       />
 
+      {/* Sun */}
       <mesh>
         <sphereGeometry args={[0.7, 48, 32]} />
         <meshBasicMaterial color="#ffd27a" />
       </mesh>
 
-      <OrbitPath date={date} color="#45536e" />
+      {/* Earth solar orbit */}
+      <OrbitPath date={date} color="#e6bd78" />
 
+      {/* Moon orbit around Earth */}
+      <MoonOrbitPath earth={e} />
+
+      {/* Earth-to-Moon connecting line */}
       <Line
         points={[
           [e.x, e.y, e.z],
@@ -306,6 +353,7 @@ function Scene({
         lineWidth={1}
       />
 
+      {/* Earth */}
       <group ref={earthRef} position={[e.x, e.y, e.z]}>
         <mesh>
           <sphereGeometry args={[0.32, 128, 96]} />
@@ -336,6 +384,7 @@ function Scene({
         </mesh>
       </group>
 
+      {/* Moon */}
       <group ref={moonRef} position={[m.x, m.y, m.z]}>
         <mesh>
           <sphereGeometry args={[0.105, 96, 64]} />
