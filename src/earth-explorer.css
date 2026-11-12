@@ -15,49 +15,105 @@
 .earth-explorer-controls {
   position: absolute;
   z-index: 6;
-  top: 54px;
-  right: 16px;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  width: 156px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(139, 164, 202, 0.25);
+  border-radius: 10px;
+  background: rgba(5, 12, 25, 0.82);
+  backdrop-filter: blur(14px);
 }
 
-.earth-mode-switch,
-.earth-action-switch {
-  display: flex;
-  gap: 5px;
-  padding: 5px;
-  border: 1px solid rgba(139, 164, 202, 0.3);
-  border-radius: 8px;
-  background: rgba(5, 12, 25, 0.82);
-  backdrop-filter: blur(12px);
+.earth-toolbar-heading {
+  padding: 3px 8px 8px;
+  color: #7f91ad;
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: .16em;
 }
 
 .earth-explorer-controls button,
 .earth-map-return {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
   border: 1px solid transparent;
-  border-radius: 5px;
-  padding: 9px 11px;
+  border-radius: 6px;
+  padding: 10px 9px;
   background: transparent;
   color: #aab8ce;
+  text-align: left;
   font: 9px 'DM Mono', monospace;
-  letter-spacing: .08em;
+  letter-spacing: .07em;
+  cursor: pointer;
   transition: .2s ease;
+}
+
+.earth-explorer-controls button span {
+  width: 14px;
+  color: #8da5c7;
+  font-size: 13px;
+  text-align: center;
 }
 
 .earth-explorer-controls button:hover,
 .earth-explorer-controls button.active,
 .earth-map-return:hover {
   color: #f4d69b;
-  border-color: rgba(230, 192, 123, 0.55);
+  border-color: rgba(230, 192, 123, 0.5);
   background: rgba(230, 192, 123, 0.1);
+}
+
+.earth-toolbar-divider {
+  height: 1px;
+  margin: 5px 3px;
+  background: rgba(139, 164, 202, 0.2);
+}
+
+.earth-toolbar-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 10px 7px 3px;
+  border-top: 1px solid rgba(139, 164, 202, 0.2);
+  color: #91a2bd;
+  font: 8px 'DM Mono', monospace;
+  letter-spacing: .06em;
+}
+
+.earth-toolbar-legend div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.earth-toolbar-legend i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.moon-orbit-dot {
+  background: #a9c8ef;
+  box-shadow: 0 0 7px rgba(169, 200, 239, .7);
+}
+
+.earth-orbit-dot {
+  background: #e6bd78;
+  box-shadow: 0 0 7px rgba(230, 189, 120, .7);
 }
 
 .earth-explorer-readout {
   position: absolute;
   z-index: 4;
-  left: 18px;
+  left: 190px;
   bottom: 42px;
   display: flex;
   flex-direction: column;
@@ -110,6 +166,7 @@
   z-index: 10;
   top: 54px;
   right: 18px;
+  width: auto;
   border-color: rgba(230, 192, 123, .55);
   background: rgba(5, 12, 25, .9);
   color: #f4d69b;
@@ -117,31 +174,30 @@
 
 @media (max-width: 700px) {
   .earth-explorer-controls {
-    top: 52px;
-    left: 10px;
-    right: 10px;
-    align-items: stretch;
-  }
-
-  .earth-mode-switch,
-  .earth-action-switch {
-    justify-content: center;
-    flex-wrap: wrap;
+    top: 62px;
+    left: 8px;
+    transform: none;
+    width: 132px;
+    padding: 7px;
   }
 
   .earth-explorer-controls button {
-    padding: 8px 9px;
+    padding: 8px 6px;
     font-size: 8px;
   }
 
+  .earth-toolbar-legend {
+    font-size: 7px;
+  }
+
   .earth-explorer-readout {
+    left: 10px;
     bottom: 48px;
-    left: 12px;
   }
 
   .earth-explorer-hint {
-    left: 12px;
-    right: 12px;
+    left: 10px;
+    right: 10px;
     bottom: 14px;
     text-align: right;
     font-size: 8px;
